@@ -1,7 +1,7 @@
 // ===============================
-// CESIUM BIM VIEWER - MODERN UI MODULE v3.1
+// CESIUM BIM VIEWER - MODERN UI MODULE v3.2 (INTEGRATED Z-OFFSET) - COMPLETE
 // Minimalist Design with Collapsible Sections
-// NEW: iTwin Integration with Share Key + iModel ID inputs
+// NEW: Z-Offset controls directly in asset list (-70m to +70m)
 // ===============================
 'use strict';
 
@@ -15,7 +15,7 @@ const BimViewerUI = {
       this.createModernToolbar();
       this.initEventHandlers();
       this.initCollapseHandlers();
-      console.log('✅ Modern BIM Viewer UI initialized v3.1 (iTwin Integration)');
+      console.log('✅ Modern BIM Viewer UI initialized v3.2 (Integrated Z-Offset -70m to +70m)');
     } catch (error) {
       console.error('❌ Failed to initialize UI:', error);
     }
@@ -37,6 +37,7 @@ const BimViewerUI = {
     
     // Collapsible sections
     toolbar.appendChild(this.createSection('assets', '📦', 'Assets', this.getAssetsContent()));
+    toolbar.appendChild(this.createSection('lighting', '☀️', 'Lighting & Time', this.getLightingContent()));
     toolbar.appendChild(this.createSection('pointcloud', '☁️', 'Point Cloud Settings', this.getPointCloudContent()));
     toolbar.appendChild(this.createSection('drawing', '✏️', 'Drawing & Clipping', this.getDrawingContent()));
     toolbar.appendChild(this.createSection('comments', '💬', 'Comments', this.getCommentsContent()));
@@ -145,6 +146,81 @@ const BimViewerUI = {
       </div>
       
       <div id="loadedAssetsList" class="modern-assets-list"></div>
+    `;
+  },
+
+  // Lighting & Time content
+  getLightingContent() {
+    return `
+      <div class="modern-group">
+        <div class="modern-label">☀️ Dynamic Lighting</div>
+        
+        <button id="toggleDynamicLighting" class="modern-btn modern-btn-primary">
+          <span class="modern-btn-icon">🌅</span>
+          <span>Enable Lighting</span>
+        </button>
+        
+        <div id="lightingControls" style="display: none; margin-top: 12px;">
+          <div class="modern-label-small">Night Brightness</div>
+          <select id="ambientLightMode" class="modern-select" style="margin-bottom: 12px;">
+            <option value="realistic" selected>🌙 Realistic (Dark at Night)</option>
+            <option value="soft">🌆 Soft (Slightly Visible)</option>
+            <option value="balanced">🌃 Balanced (Moderately Lit)</option>
+            <option value="bright">💡 Bright (Always Visible)</option>
+          </select>
+          
+          <div class="modern-hint" style="margin-bottom: 12px; font-size: 10px;">
+            <strong>🌙 Realistic:</strong> Assets are completely dark at night (like real life)<br>
+            <strong>🌆 Soft:</strong> Slight ambient glow at night (subtle)<br>
+            <strong>🌃 Balanced:</strong> Moderate visibility at night<br>
+            <strong>💡 Bright:</strong> Always bright (default Cesium)
+          </div>
+          
+          <div class="modern-label-small">Time of Day</div>
+          
+          <div class="modern-time-presets">
+            <button class="modern-time-btn" data-time="dawn" title="6:00 AM">🌄 Dawn</button>
+            <button class="modern-time-btn" data-time="morning" title="9:00 AM">🌞 Morning</button>
+            <button class="modern-time-btn" data-time="noon" title="12:00 PM">☀️ Noon</button>
+            <button class="modern-time-btn" data-time="afternoon" title="3:00 PM">🌤️ Afternoon</button>
+            <button class="modern-time-btn" data-time="sunset" title="6:00 PM">🌇 Sunset</button>
+            <button class="modern-time-btn" data-time="dusk" title="7:30 PM">🌆 Dusk</button>
+            <button class="modern-time-btn" data-time="night" title="11:00 PM">🌙 Night</button>
+            <button class="modern-time-btn" data-time="midnight" title="12:00 AM">🌃 Midnight</button>
+          </div>
+          
+          <div style="margin-top: 12px;">
+            <div class="modern-label-small">Time Animation</div>
+            <div class="modern-btn-group">
+              <button id="toggleTimeAnimation" class="modern-btn modern-btn-small">
+                <span class="modern-btn-icon">▶️</span>
+                <span>Play</span>
+              </button>
+              <button id="stopTimeAnimation" class="modern-btn modern-btn-small">
+                <span class="modern-btn-icon">⏸️</span>
+                <span>Pause</span>
+              </button>
+            </div>
+            
+            <div style="margin-top: 8px;">
+              <label class="modern-label-small">
+                Speed: <span id="timeSpeedValue">100x</span>
+              </label>
+              <input type="range" 
+                     id="timeSpeedSlider" 
+                     class="modern-slider"
+                     min="1" 
+                     max="1000" 
+                     value="100"
+                     style="width: 100%;">
+            </div>
+          </div>
+          
+          <div class="modern-hint" style="margin-top: 12px;">
+            <strong>💡 Tip:</strong> Set to "Realistic" and try "🌙 Night" preset to see assets become completely dark!
+          </div>
+        </div>
+      </div>
     `;
   },
 
@@ -485,9 +561,9 @@ const BimViewerUI = {
     });
   },
 
-  // Initialize all event handlers
+  // ✅ COMPLETE: Initialize all event handlers
   initEventHandlers() {
-    // ✅ NEW: iTwin Model Import
+    // ✅ iTwin Model Import
     document.getElementById('importITwinModel')?.addEventListener('click', () => {
       const shareKey = document.getElementById('iTwinShareKeyInput').value.trim();
       const iModelId = document.getElementById('iTwinModelIdInput').value.trim();
@@ -524,7 +600,7 @@ const BimViewerUI = {
       }
     });
 
-    // ✅ EXISTING: Ion Assets
+    // ✅ Ion Assets Loading
     document.getElementById('loadIonAssets')?.addEventListener('click', async () => {
       const btn = document.getElementById('loadIonAssets');
       const selector = document.getElementById('ionAssetSelector');
@@ -689,9 +765,75 @@ const BimViewerUI = {
       BimViewer.setGlobeTransparency(alpha);
       document.getElementById('globeAlphaValue').textContent = Math.round(alpha * 100) + '%';
     });
+
+    // ⭐ NEW: Lighting Controls
+    document.getElementById('toggleDynamicLighting')?.addEventListener('click', function() {
+      const isEnabled = BimViewer.lighting?.enabled || false;
+      BimViewer.enableDynamicLighting(!isEnabled);
+      
+      const controls = document.getElementById('lightingControls');
+      const btn = this;
+      
+      if (!isEnabled) {
+        // Enable
+        btn.classList.add('active');
+        btn.innerHTML = '<span class="modern-btn-icon">🌞</span><span>Lighting ON</span>';
+        if (controls) controls.style.display = 'block';
+      } else {
+        // Disable
+        btn.classList.remove('active');
+        btn.innerHTML = '<span class="modern-btn-icon">🌅</span><span>Enable Lighting</span>';
+        if (controls) controls.style.display = 'none';
+      }
+    });
+    
+    // Ambient lighting mode selector
+    document.getElementById('ambientLightMode')?.addEventListener('change', function() {
+      const mode = this.value;
+      if (typeof BimViewer.setAmbientLightingMode === 'function') {
+        BimViewer.setAmbientLightingMode(mode);
+      }
+    });
+    
+    // Time preset buttons
+    document.querySelectorAll('.modern-time-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const preset = this.dataset.time;
+        BimViewer.setPresetTime(preset);
+        
+        // Visual feedback
+        document.querySelectorAll('.modern-time-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+    
+    // Time animation toggle
+    document.getElementById('toggleTimeAnimation')?.addEventListener('click', function() {
+      const speed = parseInt(document.getElementById('timeSpeedSlider').value);
+      BimViewer.animateTime(true, speed);
+      this.classList.add('active');
+      document.getElementById('stopTimeAnimation')?.classList.remove('active');
+    });
+    
+    document.getElementById('stopTimeAnimation')?.addEventListener('click', function() {
+      BimViewer.animateTime(false);
+      this.classList.add('active');
+      document.getElementById('toggleTimeAnimation')?.classList.remove('active');
+    });
+    
+    // Time speed slider
+    document.getElementById('timeSpeedSlider')?.addEventListener('input', function() {
+      const speed = parseInt(this.value);
+      document.getElementById('timeSpeedValue').textContent = speed + 'x';
+      
+      // Update speed if animation is running
+      if (BimViewer.lighting?.animateTime) {
+        BimViewer.viewer.clock.multiplier = speed;
+      }
+    });
   },
 
-  // Create asset control (called when asset is loaded)
+  // ⭐ NEW: Create asset control WITH INTEGRATED Z-OFFSET
   createAssetControls(assetId) {
     const container = document.getElementById('loadedAssetsList');
     if (!container) return;
@@ -703,12 +845,17 @@ const BimViewerUI = {
     assetDiv.id = `asset_${assetId}`;
     assetDiv.className = 'modern-asset-item';
     
-    // Add special class for iTwin models
     if (assetData.type === 'ITWIN') {
       assetDiv.classList.add('modern-asset-itwin');
     }
     
+    // Get current offset value if any
+    const hasIndividualOffset = BimViewer.zOffset && BimViewer.zOffset.individualOffsets.has(assetData.tileset);
+    const currentOffset = hasIndividualOffset ? 
+      BimViewer.zOffset.individualOffsets.get(assetData.tileset) : 0;
+    
     assetDiv.innerHTML = `
+      <!-- Asset Header -->
       <div class="modern-asset-header">
         <div class="modern-asset-name">${assetData.name}</div>
         <div class="modern-asset-controls">
@@ -717,6 +864,8 @@ const BimViewerUI = {
           <button class="modern-icon-btn modern-icon-btn-danger" onclick="BimViewer.unloadAsset('${assetId}')" title="Remove">🗑️</button>
         </div>
       </div>
+      
+      <!-- Opacity Control -->
       <div class="modern-asset-opacity">
         <label class="modern-label-small">Opacity</label>
         <input type="range" min="0" max="1" step="0.1" value="1" 
@@ -724,9 +873,169 @@ const BimViewerUI = {
                class="modern-slider-small">
         <span id="opacityValue_${assetId}" class="modern-value-small">100%</span>
       </div>
+      
+      <!-- 🏔️ Z-OFFSET CONTROLS (COMPACT VERSION -5m to +5m) -->
+      <div class="modern-asset-zoffset">
+        <div class="zoffset-label-row">
+          <label class="modern-label-small">🏔️ Z-Offset</label>
+          <span class="zoffset-value" id="zoffset_value_${assetId}">${currentOffset >= 0 ? '+' : ''}${currentOffset.toFixed(2)} m</span>
+        </div>
+        
+        <!-- Slider with color gradient (-5m to +5m) -->
+        <input type="range" 
+               id="zoffset_slider_${assetId}"
+               class="zoffset-slider"
+               min="-5" 
+               max="5" 
+               step="0.01" 
+               value="${currentOffset}"
+               oninput="BimViewerUI.updateAssetZOffset('${assetId}', this.value)">
+        
+        <!-- Input Box for explicit value -->
+        <div class="zoffset-input-row">
+          <input type="number" 
+                 id="zoffset_input_${assetId}"
+                 class="zoffset-input-box"
+                 min="-5" 
+                 max="5" 
+                 step="0.01" 
+                 value="${currentOffset.toFixed(2)}"
+                 placeholder="0.00"
+                 onchange="BimViewerUI.setAssetZOffsetFromInput('${assetId}', this.value)">
+          <button class="zoffset-reset-btn" 
+                  onclick="BimViewerUI.setAssetZOffsetFromInput('${assetId}', 0)"
+                  title="Reset to 0">
+            ↺
+          </button>
+        </div>
+      </div>
     `;
 
     container.appendChild(assetDiv);
+  },
+
+  // ⭐ NEW: Update asset Z-Offset (with debouncing)
+  updateAssetZOffset(assetId, value) {
+    const offsetValue = parseFloat(value);
+    const valueDisplay = document.getElementById(`zoffset_value_${assetId}`);
+    const inputBox = document.getElementById(`zoffset_input_${assetId}`);
+    
+    if (valueDisplay) {
+      valueDisplay.textContent = `${offsetValue >= 0 ? '+' : ''}${offsetValue.toFixed(2)} m`;
+      
+      // Color coding based on value (adjusted for -5 to +5 range)
+      if (offsetValue < -3) {
+        valueDisplay.style.color = '#f44336'; // Red (deep)
+      } else if (offsetValue < -1) {
+        valueDisplay.style.color = '#ff9800'; // Orange
+      } else if (offsetValue >= -1 && offsetValue <= 1) {
+        valueDisplay.style.color = '#4caf50'; // Green (near zero)
+      } else if (offsetValue <= 3) {
+        valueDisplay.style.color = '#2196f3'; // Blue
+      } else {
+        valueDisplay.style.color = '#9c27b0'; // Purple (high)
+      }
+    }
+    
+    // Update input box to match slider
+    if (inputBox) {
+      inputBox.value = offsetValue.toFixed(2);
+    }
+    
+    // SMOOTH live updates - use requestAnimationFrame for 60fps
+    if (this._zoffsetAnimationFrame) {
+      cancelAnimationFrame(this._zoffsetAnimationFrame);
+    }
+    
+    this._zoffsetAnimationFrame = requestAnimationFrame(() => {
+      if (typeof BimViewer.applyIndividualZOffset === 'function') {
+        // Pass isLiveUpdate=true to reduce console logging during slider movement
+        BimViewer.applyIndividualZOffset(assetId, offsetValue, true);
+      }
+    });
+  },
+
+  // ⭐ NEW: Set Z-Offset from input box
+  setAssetZOffsetFromInput(assetId, value) {
+    let offsetValue = parseFloat(value);
+    
+    // Clamp to valid range
+    if (isNaN(offsetValue)) {
+      offsetValue = 0;
+    } else if (offsetValue < -5) {
+      offsetValue = -5;
+    } else if (offsetValue > 5) {
+      offsetValue = 5;
+    }
+    
+    const slider = document.getElementById(`zoffset_slider_${assetId}`);
+    const inputBox = document.getElementById(`zoffset_input_${assetId}`);
+    const valueDisplay = document.getElementById(`zoffset_value_${assetId}`);
+    
+    // Update all controls
+    if (slider) {
+      slider.value = offsetValue;
+    }
+    
+    if (inputBox) {
+      inputBox.value = offsetValue.toFixed(2);
+    }
+    
+    if (valueDisplay) {
+      valueDisplay.textContent = `${offsetValue >= 0 ? '+' : ''}${offsetValue.toFixed(2)} m`;
+      
+      // Color coding
+      if (offsetValue < -3) {
+        valueDisplay.style.color = '#f44336';
+      } else if (offsetValue < -1) {
+        valueDisplay.style.color = '#ff9800';
+      } else if (offsetValue >= -1 && offsetValue <= 1) {
+        valueDisplay.style.color = '#4caf50';
+      } else if (offsetValue <= 3) {
+        valueDisplay.style.color = '#2196f3';
+      } else {
+        valueDisplay.style.color = '#9c27b0';
+      }
+    }
+    
+    // Apply Z-offset
+    if (typeof BimViewer.applyIndividualZOffset === 'function') {
+      BimViewer.applyIndividualZOffset(assetId, offsetValue, false);
+      BimViewer.updateStatus(`Z-Offset set to ${offsetValue >= 0 ? '+' : ''}${offsetValue.toFixed(2)}m`, 'success');
+    }
+  },
+
+  // ⭐ NEW: Set asset Z-Offset preset
+  setAssetZOffsetPreset(assetId, value) {
+    const slider = document.getElementById(`zoffset_slider_${assetId}`);
+    const valueDisplay = document.getElementById(`zoffset_value_${assetId}`);
+    
+    if (slider) {
+      slider.value = value;
+    }
+    
+    // Update display
+    if (valueDisplay) {
+      valueDisplay.textContent = `${value >= 0 ? '+' : ''}${value.toFixed(1)} m`;
+      
+      // Color coding
+      if (value < -30) {
+        valueDisplay.style.color = '#f44336';
+      } else if (value < -10) {
+        valueDisplay.style.color = '#ff9800';
+      } else if (value < 10) {
+        valueDisplay.style.color = '#4caf50';
+      } else if (value < 40) {
+        valueDisplay.style.color = '#2196f3';
+      } else {
+        valueDisplay.style.color = '#9c27b0';
+      }
+    }
+    
+    // Preset buttons are explicit user actions, so log them (isLiveUpdate=false)
+    if (typeof BimViewer.applyIndividualZOffset === 'function') {
+      BimViewer.applyIndividualZOffset(assetId, value, false);
+    }
   }
 };
 
@@ -742,4 +1051,4 @@ if (document.readyState === 'loading') {
   setTimeout(() => BimViewerUI.init(), 100);
 }
 
-console.log('✅ Modern UI module v3.1 loaded - iTwin Integration with Share Keys');
+console.log('✅ Modern UI module v3.2 (COMPLETE) loaded - Integrated Z-Offset Controls (-70m to +70m)');

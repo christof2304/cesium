@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CESIUM | BIM Viewer - Modern Edition (Enhanced Clipping)</title>
+  <title>CESIUM | BIM Viewer - Lighting v4.0 (WORKING)</title>
   
   <!-- Favicon Fix -->
   <link rel="icon" href="data:,">
@@ -18,6 +18,15 @@
   
   <!-- Modern Styles -->
   <link rel="stylesheet" href="style.css">
+  
+  <!-- Z-Offset Styles -->
+  <link rel="stylesheet" href="integrated-zoffset-styles.css">
+  
+  <!-- 🔥 Lighting v4.0 Styles -->
+  <link rel="stylesheet" href="lighting-styles.css">
+  
+  <!-- Comments Styles -->
+  <link rel="stylesheet" href="comments-styles.css">
 </head>
 <body>
   <!-- Main Cesium Container -->
@@ -69,7 +78,7 @@
         <select id="commentCategory" style="width: 100%; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; background: rgba(255,255,255,0.05); color: white; box-sizing: border-box; font-size: 14px;">
           <option value="General">📋 General</option>
           <option value="Architecture">🏛️ Architecture</option>
-          <option value="Structure">🏗️ Structure</option>
+          <option value="Structure">🗿 Structure</option>
           <option value="MEP">⚡ MEP</option>
           <option value="Issue">⚠️ Issue</option>
           <option value="Question">❓ Question</option>
@@ -96,7 +105,6 @@
     </div>
   </div>
 
-  <!-- Add focus styles for inputs -->
   <style>
     #commentDialog input:focus,
     #commentDialog textarea:focus,
@@ -120,7 +128,11 @@
     }
   </style>
 
-  <!-- Load JavaScript modules in correct order -->
+  <!-- ============================================
+       JAVASCRIPT MODULES - LOAD ORDER IS CRITICAL!
+       ============================================ -->
+  
+  <!-- 1. Core Modules (Foundation) -->
   <script src="core.js"></script>
   <script src="features.js"></script>
   <script src="hideFeatures.js"></script>
@@ -128,39 +140,85 @@
   <script src="pointcloud.js"></script>
   <script src="measurement.js"></script>
   
-  <!-- ✅ NEW: Enhanced Clipping Module -->
+  <!-- 2. Enhanced Clipping Module -->
   <script src="clipping.js"></script>
   
+  <!-- 3. Z-Offset Module v2.0 -->
+  <script src="z-offset.js"></script>
+  
+  <!-- ============================================
+       🔥 LIGHTING v4.0 - NEW SETUP
+       ============================================ -->
+  
+  <!-- 4. 🔥 Lighting Module v4.0 (MUST be loaded FIRST!) -->
+  <script src="lighting.js"></script>
+  
+  <!-- 4.5. 🔥 NEW: Standalone Lighting UI (loads BEFORE ui.js) -->
+  <script src="ui-lighting-standalone.js"></script>
+  
+  <!-- ============================================
+       UI MODULES
+       ============================================ -->
+  
+  <!-- 5. UI Module v3.3 -->
   <script src="ui.js"></script>
+  
+  <!-- 6. UI Extensions -->
   <script src="ui-comments-extension.js"></script>
-  
-  <!-- ✅ NEW: Clipping UI Extension -->
   <script src="ui-clipping-extension.js"></script>
+  <script src="ui-z-offset-extension.js"></script>
   
+  <!-- 7. ⚠️ OLD Lighting UI Extension - NOT NEEDED ANYMORE (auskommentiert) -->
+  <!-- <script src="ui-lighting-extension.js"></script> -->
+  
+  <!-- 8. UI Helpers (final touches) -->
   <script src="ui-helpers-modern.js"></script>
   
+  <!-- ============================================
+       INITIALIZATION SCRIPT
+       ============================================ -->
   <script>
-    // Initialize comments after everything is loaded AND an asset is present
     window.addEventListener('load', function() {
-      console.log('🚀 Page loaded, waiting for asset before initializing comments...');
+      console.log('🚀 Page loaded, initializing BIM Viewer...');
+      console.log('');
+      console.log('📋 MODULE LOAD ORDER:');
+      console.log('   1. Core, Features, Comments, etc.');
+      console.log('   2. Clipping, Z-Offset');
+      console.log('   3. 🔥 Lighting v4.0 (NEW - Fixed & Working)');
+      console.log('   4. 🔥 Standalone Lighting UI (NEW)');
+      console.log('   5. UI.js');
+      console.log('   6. UI Extensions');
+      console.log('   7. UI Helpers');
+      console.log('');
       
       // Wait for BimViewer and an asset to be loaded
-      const initComments = setInterval(function() {
+      const initSystems = setInterval(function() {
         if (typeof BimViewer !== 'undefined' && BimViewer.viewer) {
+          
+          // ⭐ EARLY INIT: Initialize lighting system IMMEDIATELY
+          if (typeof BimViewer.initLighting === 'function' && !BimViewer.lighting) {
+            BimViewer.initLighting();
+            console.log('✅ Lighting system initialized (early)');
+          } else if (!BimViewer.initLighting) {
+            console.warn('⚠️ BimViewer.initLighting not found - lighting-v4.js may not be loaded!');
+          }
           
           // Check if at least one asset is loaded
           if (BimViewer.loadedAssets && BimViewer.loadedAssets.size > 0) {
-            clearInterval(initComments);
-            console.log('✅ Asset detected, initializing comments system...');
+            clearInterval(initSystems);
+            console.log('✅ Asset detected, initializing all systems...');
             
             // Initialize Firebase
-            if (BimViewer.initFirebase()) {
+            if (BimViewer.initFirebase && BimViewer.initFirebase()) {
               console.log('✅ Firebase initialized automatically');
-              document.getElementById('commentsListStatus').textContent = 'Ready';
+              const statusEl = document.getElementById('commentsListStatus');
+              if (statusEl) statusEl.textContent = 'Ready';
             } else {
               console.log('⚠️ Firebase initialization failed - showing manual init button');
-              document.getElementById('initFirebaseBtn').style.display = 'block';
-              document.getElementById('commentsListStatus').textContent = 'Not initialized';
+              const initBtn = document.getElementById('initFirebaseBtn');
+              if (initBtn) initBtn.style.display = 'block';
+              const statusEl = document.getElementById('commentsListStatus');
+              if (statusEl) statusEl.textContent = 'Not initialized';
             }
             
             // Initialize comment click handler
@@ -181,14 +239,37 @@
               console.log('✅ Point cloud settings initialized');
             }
             
-            console.log('🎉 Comments system ready!');
+            console.log('🎉 All systems ready!');
+            console.log('');
+            console.log('🌅 LIGHTING v4.0 READY:');
+            console.log('   ✅ Find "☀️ Lighting & Time" in toolbar');
+            console.log('   ✅ Click "Enable Lighting" to start');
+            console.log('   ✅ All controls will appear automatically');
+            console.log('   ✅ Try Quick Presets for instant effects!');
+            console.log('');
+            console.log('🔥 NEW FEATURES:');
+            console.log('   ✅ Real-time status display');
+            console.log('   ✅ 4 Ambient modes (Realistic, Soft, Balanced, Bright)');
+            console.log('   ✅ 8 Time presets (Dawn to Midnight)');
+            console.log('   ✅ Time animation with adjustable speed');
+            console.log('   ✅ 4 Quick Presets (Moonlight, Golden Hour, etc.)');
+            console.log('');
+            console.log('💡 QUICK START:');
+            console.log('   1. Click "Enable Lighting"');
+            console.log('   2. Try "🌙 Moonlight" preset');
+            console.log('   3. Watch the magic happen! ✨');
+            console.log('');
+            console.log('🔍 DEBUG:');
+            console.log('   - Check status: BimViewer.getLightingStatus()');
+            console.log('   - Test terrain: testTerrainReload()');
+            console.log('   - Force update: BimViewer.updateAllTilesets()');
+            
           } else {
             // Update status to show waiting for asset
             const statusEl = document.getElementById('commentsListStatus');
             if (statusEl) {
               statusEl.textContent = 'Waiting for asset...';
             }
-            console.log('⏳ Waiting for asset to be loaded before initializing comments...');
           }
         }
       }, 500);

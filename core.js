@@ -22,9 +22,9 @@ const CONFIG = {
     DEFAULT_POSITION: {
       longitude: 10.9544,
       latitude: 50.7323,
-      height: 2000000,  // 2 Millionen Meter für gute Übersicht
+      height: 10000000,  // 10 Millionen Meter für sicheren Globe-View (nicht zu extrem)
       heading: 0,
-      pitch: -45  // -45° für besseren Blickwinkel
+      pitch: -89  // -89° für Top-Down Ansicht (nicht exakt -90° wegen Gimbal Lock)
     }
   },
   
@@ -265,6 +265,32 @@ const BimViewer = {
       
       console.log('✅ Viewer created with World Terrain (Working Method from your old core.js)');
       
+      // ✅ Add Rendering Error Handler to catch Property/Semantic errors
+      this.viewer.scene.renderError.addEventListener((scene, error) => {
+        console.error('🔴 Cesium Rendering Error:', error);
+        console.error('   Error Type:', error.name);
+        console.error('   Message:', error.message);
+        
+        // Check if it's a property-related error
+        if (error.message && error.message.includes('propertiesBySemantic')) {
+          console.warn('⚠️ Property/Semantic error detected - attempting to continue rendering...');
+          console.warn('   This asset may have invalid or missing property definitions.');
+          console.warn('   The asset will still be visible but some features may not work.');
+        }
+        
+        // Attempt to restart rendering
+        try {
+          console.log('🔄 Attempting to restart rendering...');
+          scene.requestRender();
+          this.updateStatus('Rendering error occurred - attempting recovery', 'error');
+        } catch (restartError) {
+          console.error('❌ Failed to restart rendering:', restartError);
+          this.updateStatus('Critical rendering error - page reload may be required', 'error');
+        }
+      });
+      
+      console.log('✅ Rendering error handler installed');
+      
       // ✅ Store reference to terrain (already loaded by viewer)
       this.terrain.worldTerrain = this.viewer.scene.terrain;
       this.terrain.current = 'worldTerrain';
@@ -332,6 +358,7 @@ const BimViewer = {
       
       this.initIFCFilter();
       this.initCamera();
+      this.initZOffset();
 
       console.log('✅ BIM Viewer initialized successfully');
       this.updateStatus('BIM Viewer ready', 'success');
@@ -375,11 +402,26 @@ const BimViewer = {
         const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(CONFIG.cesium.GOOGLE_3D_TILES_ASSET_ID);
         
         this.viewer.scene.primitives.add(tileset);
+        
+        // ⭐ Enable lighting for Google 3D Tiles
+        this.enableTilesetLighting(tileset);
+        
         this.googleTiles.tileset = tileset;
         this.googleTiles.enabled = true;
         this.googleTiles.isLoading = false;
         
+        // ✅ IMPORTANT: When Google 3D Tiles is enabled, hide globe and imagery
+        this.viewer.scene.globe.show = false;
+        
+        // ✅ Also hide OSM Buildings if loaded
+        if (this.osmBuildings.tileset) {
+          this.osmBuildings.tileset.show = false;
+          this.osmBuildings.enabled = false;
+        }
+        
         console.log('✅ Google 3D Tiles loaded successfully');
+        console.log('   - Globe hidden (using Google 3D Tiles as base)');
+        console.log('   - OSM Buildings hidden');
         this.updateStatus('Google 3D Tiles enabled', 'success');
         
       } catch (error) {
@@ -388,11 +430,40 @@ const BimViewer = {
         this.updateStatus('Failed to load Google 3D Tiles', 'error');
       }
     } else {
+      // Toggle existing tileset
       this.googleTiles.enabled = !this.googleTiles.enabled;
       this.googleTiles.tileset.show = this.googleTiles.enabled;
       
+      if (this.googleTiles.enabled) {
+        // ✅ Enabling Google 3D Tiles: Hide globe and imagery
+        this.viewer.scene.globe.show = false;
+        
+        // Hide OSM Buildings
+        if (this.osmBuildings.tileset) {
+          this.osmBuildings.tileset.show = false;
+          this.osmBuildings.enabled = false;
+        }
+        
+        console.log('🌍 Google 3D Tiles enabled');
+        console.log('   - Globe hidden');
+        console.log('   - OSM Buildings hidden');
+        
+      } else {
+        // ✅ Disabling Google 3D Tiles: Show globe and imagery again
+        this.viewer.scene.globe.show = true;
+        
+        // Re-enable OSM Buildings if it was loaded before
+        if (this.osmBuildings.tileset) {
+          this.osmBuildings.tileset.show = true;
+          this.osmBuildings.enabled = true;
+        }
+        
+        console.log('🌍 Google 3D Tiles disabled');
+        console.log('   - Globe shown');
+        console.log('   - OSM Buildings shown');
+      }
+      
       const status = this.googleTiles.enabled ? 'enabled' : 'disabled';
-      console.log(`🌍 Google 3D Tiles ${status}`);
       this.updateStatus(`Google 3D Tiles ${status}`, 'success');
     }
   },
@@ -400,6 +471,13 @@ const BimViewer = {
   async toggleOSMBuildings() {
     if (this.osmBuildings.isLoading) {
       console.log('⏳ OSM Buildings already loading...');
+      return;
+    }
+
+    // ✅ CHECK: Don't enable OSM Buildings if Google 3D Tiles is active
+    if (this.googleTiles.enabled && this.googleTiles.tileset && this.googleTiles.tileset.show) {
+      console.warn('⚠️ Google 3D Tiles is active - OSM Buildings should not be used simultaneously');
+      this.updateStatus('Disable Google 3D Tiles first', 'warning');
       return;
     }
 
@@ -412,6 +490,10 @@ const BimViewer = {
         const tileset = await Cesium.createOsmBuildingsAsync();
         
         this.viewer.scene.primitives.add(tileset);
+        
+        // ⭐ Enable lighting for OSM Buildings
+        this.enableTilesetLighting(tileset);
+        
         this.osmBuildings.tileset = tileset;
         this.osmBuildings.enabled = true;
         this.osmBuildings.isLoading = false;
@@ -455,10 +537,36 @@ const BimViewer = {
       const resource = await Cesium.IonResource.fromAssetId(assetId);
       const tileset = await Cesium.Cesium3DTileset.fromUrl(resource, {
         maximumScreenSpaceError: 3,
-        maximumMemoryUsage: 2048
+        maximumMemoryUsage: 2048,
+        skipLevelOfDetail: false,
+        baseScreenSpaceError: 1024,
+        skipScreenSpaceErrorFactor: 16,
+        skipLevels: 1,
+        immediatelyLoadDesiredLevelOfDetail: false,
+        loadSiblings: false,
+        cullWithChildrenBounds: true
       });
 
+      // ✅ Add error handler for this specific tileset (with safety checks)
+      if (tileset && tileset.tileLoadProgressEvent) {
+        tileset.tileLoadProgressEvent.addEventListener((length) => {
+          if (length === 0) {
+            console.log(`✅ All tiles loaded for asset ${assetId}`);
+          }
+        });
+      }
+
+      if (tileset && tileset.tileFailed) {
+        tileset.tileFailed.addEventListener((error) => {
+          console.warn(`⚠️ Tile loading failed for asset ${assetId}:`, error);
+          // Don't stop rendering, just log the error
+        });
+      }
+
       this.viewer.scene.primitives.add(tileset);
+      
+      // ⭐ Enable lighting for this tileset
+      this.enableTilesetLighting(tileset);
       
       const assetData = {
         id: assetId,
@@ -487,6 +595,16 @@ const BimViewer = {
         }
       }
       
+      
+      // Update Z-Offset assets list (with delay to ensure modules are loaded)
+      if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
+        setTimeout(() => {
+          if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
+            BimViewer.updateZOffsetAssetsList();
+          }
+        }, 100);
+      }
+
       if (window.BimViewerUI && typeof BimViewerUI.createAssetControls === 'function') {
         BimViewerUI.createAssetControls(assetId);
       }
@@ -580,6 +698,9 @@ const BimViewer = {
       // Add to scene
       this.viewer.scene.primitives.add(tileset);
       
+      // ⭐ Enable lighting for this tileset
+      this.enableTilesetLighting(tileset);
+      
       // Wait for ready, then fly to it
       await tileset.readyPromise;
       
@@ -596,6 +717,16 @@ const BimViewer = {
       };
       
       this.loadedAssets.set(assetKey, assetData);
+      
+      // Update Z-Offset assets list (with delay to ensure modules are loaded)
+      if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
+        setTimeout(() => {
+          if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
+            BimViewer.updateZOffsetAssetsList();
+          }
+        }, 100);
+      }
+      
       
       // ✅ FIX: Fly to model after it's ready
       this.viewer.flyTo(tileset, {
@@ -695,6 +826,16 @@ const BimViewer = {
     }
     
     this.loadedAssets.delete(assetId.toString());
+    
+    // Update Z-Offset assets list (with delay to ensure modules are loaded)
+    if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
+      setTimeout(() => {
+        if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
+          BimViewer.updateZOffsetAssetsList();
+        }
+      }, 100);
+    }
+    
     
     const assetDiv = document.getElementById(`asset_${assetId}`);
     if (assetDiv) assetDiv.remove();
@@ -815,6 +956,28 @@ const BimViewer = {
     }, 3000);
   },
 
+  // ⭐ NEW: Enable lighting for newly added tileset (for dynamic sun-based lighting)
+  enableTilesetLighting(tileset) {
+    if (!tileset) return;
+    
+    try {
+      // Enable image-based lighting (responds to sun position)
+      if (tileset.imageBasedLighting) {
+        tileset.imageBasedLighting.enabled = true;
+        tileset.imageBasedLighting.luminanceAtZenith = 0.5;
+      }
+      
+      // Enable shadows if lighting system is enabled
+      if (this.lighting?.enabled) {
+        tileset.shadows = Cesium.ShadowMode.ENABLED;
+      }
+      
+      console.log('💡 Lighting enabled for tileset');
+    } catch (error) {
+      console.warn('Could not enable lighting for tileset:', error.message);
+    }
+  },
+
   updateModeIndicator() {
     const indicator = document.getElementById('modeIndicator');
     if (indicator && this.drawing.active) {
@@ -888,6 +1051,33 @@ window.CONFIG = CONFIG;
 window.IFC_ENTITIES = IFC_ENTITIES;
 
 console.log('✅ BimViewer object created and exposed globally');
+
+// ✅ Global Error Handler for Property/Semantic errors
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message && event.error.message.includes('propertiesBySemantic')) {
+    console.warn('⚠️ GLOBAL: Property/Semantic error caught globally');
+    console.warn('   Error:', event.error.message);
+    console.warn('   This asset may have invalid property definitions but will remain visible');
+    
+    // Prevent the error from stopping everything
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Try to restart rendering if viewer exists
+    if (window.BimViewer && window.BimViewer.viewer) {
+      try {
+        window.BimViewer.viewer.scene.requestRender();
+        console.log('🔄 Rendering restarted after property error');
+      } catch (restartError) {
+        console.error('Failed to restart rendering:', restartError);
+      }
+    }
+    
+    return false; // Prevent default error handling
+  }
+}, true); // Use capture phase
+
+console.log('✅ Global property error handler installed');
 
 // Initialize
 let initStarted = false;

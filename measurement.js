@@ -1,6 +1,7 @@
 // ===============================
-// CESIUM BIM VIEWER - ION SDK MEASUREMENT MODULE
+// CESIUM BIM VIEWER - ION SDK MEASUREMENT MODULE (FIXED v2.1)
 // Original Ion SDK Widget with Auto-Init
+// FIX: Prevents double initialization error
 // ===============================
 'use strict';
 
@@ -9,6 +10,7 @@
   // Measurement state management
   const measurementState = {
     isInitialized: false,
+    isInitializing: false,
     widgetContainer: null,
     measure: null,
     activeMeasurement: null
@@ -16,8 +18,9 @@
 
   // Initialize Ion SDK Measurements
   BimViewer.initIonMeasurements = function() {
-    if (measurementState.isInitialized) {
-      console.log('📏 Measurements already initialized');
+    // ✅ GUARD: Prevent double initialization
+    if (measurementState.isInitialized || measurementState.isInitializing) {
+      console.log('📏 Measurements already initialized - skipping');
       return;
     }
     
@@ -70,6 +73,12 @@
 
   // Setup Ion SDK Widget
   BimViewer.setupIonSDKWidget = function() {
+    // ✅ CRITICAL: Check if already initialized to prevent double binding
+    if (measurementState.isInitialized || measurementState.isInitializing || measurementState.measure) {
+      console.log('📏 Ion SDK Widget already initialized - skipping setup');
+      return;
+    }
+    
     const SDK = window.IonSdkMeasurements || window.CesiumIonSdkMeasurements;
     
     if (!SDK) {
@@ -82,6 +91,9 @@
       const container = this.getOrCreateMeasurementContainer();
       
       if (SDK.Measure) {
+        // Mark as initializing to prevent concurrent calls
+        measurementState.isInitializing = true;
+        
         measurementState.measure = new SDK.Measure({
           container: container,
           scene: this.viewer.scene,
@@ -95,8 +107,10 @@
         });
         
         measurementState.isInitialized = true;
+        measurementState.isInitializing = false;
         console.log('✅ Ion SDK Measurement Widget initialized (Original UI)');
       } else {
+        measurementState.isInitializing = false;
         console.error('SDK.Measure not available');
         this.createFallbackMeasurementUI();
         return;
@@ -111,6 +125,7 @@
       }, 500);
       
     } catch (error) {
+      measurementState.isInitializing = false;
       console.error('❌ Error setting up Ion SDK Widget:', error);
       this.createFallbackMeasurementUI();
     }
@@ -172,10 +187,8 @@
       }
     `;
     document.head.appendChild(style);
-    console.log('💉 Injected artefact fixes for Ion SDK Widget');
+    console.log('💉 Injected artefakt fixes for Ion SDK Widget');
   };
-
-  // Add toggle button to toolbar
 
   // Fallback measurement UI
   BimViewer.createFallbackMeasurementUI = function() {
@@ -193,7 +206,7 @@
             📏 Distance
           </button>
           <button onclick="BimViewer.startSimpleArea()" class="btn btn-primary" style="width: 100%; margin-bottom: 12px;">
-            ⬛ Area
+            ◼️ Area
           </button>
           <button onclick="BimViewer.clearAllMeasurements()" class="btn btn-danger" style="width: 100%;">
             🗑️ Clear All
@@ -205,6 +218,7 @@
       </div>
     `;
     
+    container.style.display = 'block';
   };
 
   // Simple distance measurement
@@ -393,16 +407,16 @@
 // ===============================
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    if (BimViewer?.viewer && !BimViewer.measurementState?.isInitialized) {
+    if (BimViewer?.viewer && !BimViewer.measurementState?.isInitialized && !BimViewer.measurementState?.isInitializing) {
       console.log('📏 Auto-initializing Ion Measurements on DOMContentLoaded');
       setTimeout(() => BimViewer.initIonMeasurements(), 500);
     }
   });
 } else {
-  if (BimViewer?.viewer && !BimViewer.measurementState?.isInitialized) {
+  if (BimViewer?.viewer && !BimViewer.measurementState?.isInitialized && !BimViewer.measurementState?.isInitializing) {
     console.log('📏 Auto-initializing Ion Measurements immediately');
     setTimeout(() => BimViewer.initIonMeasurements(), 500);
   }
 }
 
-console.log('✅ Measurement module with auto-init loaded');
+console.log('✅ Measurement module with auto-init loaded (v2.1 - Fixed double initialization)');
