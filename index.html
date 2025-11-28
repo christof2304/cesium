@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CESIUM | BIM Viewer - Lighting v4.0 (WORKING)</title>
+  <title>CESIUM | BIM Viewer - Lighting v4.0 (WITH LOGIN)</title>
   
   <!-- Favicon Fix -->
   <link rel="icon" href="data:,">
@@ -12,12 +12,16 @@
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Cesium.js"></script>
   <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Widgets/widgets.css">
   
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK (with Auth!) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   
   <!-- Modern Styles -->
   <link rel="stylesheet" href="style.css">
+  
+  <!-- 🔐 Auth Styles (NEW!) -->
+  <link rel="stylesheet" href="auth-styles.css">
   
   <!-- Z-Offset Styles -->
   <link rel="stylesheet" href="integrated-zoffset-styles.css">
@@ -29,11 +33,52 @@
   <link rel="stylesheet" href="comments-styles.css">
 </head>
 <body>
+
+  <!-- ============================================
+       🔐 LOGIN SCREEN (Shows first!)
+       ============================================ -->
+  <div id="loginScreen">
+    <div class="login-container">
+      <div class="login-header">
+        <span class="login-icon">🏗️</span>
+        <h1>CESIUM BIM Viewer</h1>
+        <p>Bitte melden Sie sich an</p>
+      </div>
+      
+      <form id="loginForm" class="login-form">
+        <div class="login-field">
+          <label for="loginEmail">E-Mail</label>
+          <input type="email" id="loginEmail" placeholder="ihre@email.de" required autocomplete="email">
+        </div>
+        
+        <div class="login-field">
+          <label for="loginPassword">Passwort</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        
+        <div id="loginError"></div>
+        
+        <button type="submit" id="loginBtn" class="login-btn">
+          <span id="loginSpinner"></span>
+          <span id="loginBtnText">Anmelden</span>
+        </button>
+      </form>
+      
+      <div class="login-footer">
+        <small>Zugang nur für autorisierte Benutzer</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       MAIN APP (Hidden until logged in)
+       ============================================ -->
+  
   <!-- Main Cesium Container -->
-  <div id="cesiumContainer"></div>
+  <div id="cesiumContainer" style="display: none;"></div>
   
   <!-- Modern Toolbar -->
-  <div id="toolbar"></div>
+  <div id="toolbar" style="display: none;"></div>
   
   <!-- Custom Info Box -->
   <div id="infoBoxCustom"></div>
@@ -132,6 +177,9 @@
        JAVASCRIPT MODULES - LOAD ORDER IS CRITICAL!
        ============================================ -->
   
+  <!-- 🔐 Auth Module (FIRST!) -->
+  <script src="auth.js"></script>
+  
   <!-- 1. Core Modules (Foundation) -->
   <script src="core.js"></script>
   <script src="features.js"></script>
@@ -179,20 +227,30 @@
        ============================================ -->
   <script>
     window.addEventListener('load', function() {
-      console.log('🚀 Page loaded, initializing BIM Viewer...');
-      console.log('');
-      console.log('📋 MODULE LOAD ORDER:');
-      console.log('   1. Core, Features, Comments, etc.');
-      console.log('   2. Clipping, Z-Offset');
-      console.log('   3. 🔥 Lighting v4.0 (NEW - Fixed & Working)');
-      console.log('   4. 🔥 Standalone Lighting UI (NEW)');
-      console.log('   5. UI.js');
-      console.log('   6. UI Extensions');
-      console.log('   7. UI Helpers');
-      console.log('');
+      console.log('🚀 Page loaded, waiting for authentication...');
       
-      // Wait for BimViewer and an asset to be loaded
+      // Wait for auth and then initialize
       const initSystems = setInterval(function() {
+        // First check if user is logged in
+        if (!BimAuth || !BimAuth.isLoggedIn()) {
+          console.log('⏳ Waiting for login...');
+          return;
+        }
+        
+        console.log('✅ User authenticated, initializing BIM Viewer...');
+        console.log('');
+        console.log('📋 MODULE LOAD ORDER:');
+        console.log('   0. 🔐 Auth (Login protection)');
+        console.log('   1. Core, Features, Comments, etc.');
+        console.log('   2. Clipping, Z-Offset');
+        console.log('   3. 🔥 Lighting v4.0 (NEW - Fixed & Working)');
+        console.log('   4. 🔥 Standalone Lighting UI (NEW)');
+        console.log('   5. UI.js');
+        console.log('   6. UI Extensions');
+        console.log('   7. UI Helpers');
+        console.log('');
+        
+        // Wait for BimViewer and an asset to be loaded
         if (typeof BimViewer !== 'undefined' && BimViewer.viewer) {
           
           // ⭐ EARLY INIT: Initialize lighting system IMMEDIATELY
@@ -208,13 +266,13 @@
             clearInterval(initSystems);
             console.log('✅ Asset detected, initializing all systems...');
             
-            // Initialize Firebase
+            // Initialize Firebase (comments - auth is separate)
             if (BimViewer.initFirebase && BimViewer.initFirebase()) {
-              console.log('✅ Firebase initialized automatically');
+              console.log('✅ Firebase Firestore initialized for comments');
               const statusEl = document.getElementById('commentsListStatus');
               if (statusEl) statusEl.textContent = 'Ready';
             } else {
-              console.log('⚠️ Firebase initialization failed - showing manual init button');
+              console.log('⚠️ Firebase Firestore initialization failed - showing manual init button');
               const initBtn = document.getElementById('initFirebaseBtn');
               if (initBtn) initBtn.style.display = 'block';
               const statusEl = document.getElementById('commentsListStatus');
@@ -241,28 +299,7 @@
             
             console.log('🎉 All systems ready!');
             console.log('');
-            console.log('🌅 LIGHTING v4.0 READY:');
-            console.log('   ✅ Find "☀️ Lighting & Time" in toolbar');
-            console.log('   ✅ Click "Enable Lighting" to start');
-            console.log('   ✅ All controls will appear automatically');
-            console.log('   ✅ Try Quick Presets for instant effects!');
-            console.log('');
-            console.log('🔥 NEW FEATURES:');
-            console.log('   ✅ Real-time status display');
-            console.log('   ✅ 4 Ambient modes (Realistic, Soft, Balanced, Bright)');
-            console.log('   ✅ 8 Time presets (Dawn to Midnight)');
-            console.log('   ✅ Time animation with adjustable speed');
-            console.log('   ✅ 4 Quick Presets (Moonlight, Golden Hour, etc.)');
-            console.log('');
-            console.log('💡 QUICK START:');
-            console.log('   1. Click "Enable Lighting"');
-            console.log('   2. Try "🌙 Moonlight" preset');
-            console.log('   3. Watch the magic happen! ✨');
-            console.log('');
-            console.log('🔍 DEBUG:');
-            console.log('   - Check status: BimViewer.getLightingStatus()');
-            console.log('   - Test terrain: testTerrainReload()');
-            console.log('   - Force update: BimViewer.updateAllTilesets()');
+            console.log('🔐 LOGGED IN AS:', BimAuth.getCurrentUser()?.email);
             
           } else {
             // Update status to show waiting for asset
