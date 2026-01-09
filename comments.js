@@ -1,29 +1,15 @@
 // ===============================
-// CESIUM BIM VIEWER - COMMENTS MODULE (v4.3 - FIREBASE FIX)
+// CESIUM BIM VIEWER - COMMENTS MODULE (v4.4 - FIREBASE FIX)
 // 3D Comment/Annotation System with Point & Area Support
 // NO LEFT-CLICK CONFLICT!
-// VERSION: 4.3 - FIXED: Firebase initialization check for auth.js compatibility
+// VERSION: 4.4 - FIXED: Never calls initializeApp - uses auth.js instance
 // ===============================
 'use strict';
 
 (function() {
   
-  console.log('💬 Loading Comments module v4.3 (FIREBASE FIX)...');
+  console.log('💬 Loading Comments module v4.4 (FIREBASE FIX)...');
   console.log('✅ New functions available: toggleAllCommentsVisibility(), deleteAllComments()');
-
-  // =====================================
-  // CONFIGURATION
-  // =====================================
-  
-  const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyAL409coGn10I8afll2aae5vuvog_qVWZA",
-    authDomain: "publictwin-ad6c7.firebaseapp.com",
-    projectId: "publictwin-ad6c7",
-    storageBucket: "publictwin-ad6c7.firebasestorage.app",
-    messagingSenderId: "151464184627",
-    appId: "1:151464184627:web:4de03973466ef510eecc46",
-    measurementId: "G-FWHRLCGJ4G"
-  };
 
   // =====================================
   // UTILITY FUNCTIONS
@@ -110,7 +96,7 @@
   };
 
   // =====================================
-  // FIREBASE INITIALIZATION (v4.3 FIXED)
+  // FIREBASE INITIALIZATION (v4.4 FIXED)
   // =====================================
   
   BimViewer.initFirebase = function() {
@@ -127,15 +113,16 @@
     }
     
     try {
-      // ✅ FIX: Prüfen ob Firebase bereits von auth.js initialisiert wurde
+      // ✅ FIX v4.4: NIEMALS initializeApp aufrufen - auth.js macht das bereits!
       if (firebase.apps.length === 0) {
-        firebase.initializeApp(FIREBASE_CONFIG);
-        console.log('✅ Firebase initialized by comments module');
-      } else {
-        console.log('✅ Firebase already initialized (by auth module)');
+        console.error('❌ Firebase not initialized by auth module!');
+        this.updateStatus('Please login first', 'error');
+        return false;
       }
       
-      // ✅ Firestore initialisieren
+      console.log('✅ Using existing Firebase instance from auth module');
+      
+      // ✅ Nur Firestore initialisieren
       this.comments.db = firebase.firestore();
       this.comments.initialized = true;
       console.log('✅ Firestore ready for comments');
@@ -1128,7 +1115,7 @@
   // =====================================
   
   BimViewer.initCommentClickHandler = function() {
-    console.log('💬 Initializing RIGHT-CLICK-only comment handler (v4.3)...');
+    console.log('💬 Initializing RIGHT-CLICK-only comment handler (v4.4)...');
     
     const handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
     
@@ -1223,12 +1210,12 @@
   // INITIALIZATION
   // =====================================
   
-  console.log('✅ Comments module loaded (v4.3 - FIREBASE FIX)');
+  console.log('✅ Comments module loaded (v4.4 - FIREBASE FIX)');
   console.log('');
-  console.log('💡 NEW in v4.3:');
-  console.log('   ✅ FIXED: Firebase initialization now works with auth.js');
+  console.log('💡 NEW in v4.4:');
+  console.log('   ✅ FIXED: Never calls initializeApp - uses auth.js instance');
   console.log('   ✅ Firebase is initialized AFTER successful login');
-  console.log('   ✅ No more "Firebase not initialized" errors');
+  console.log('   ✅ No more duplicate-app errors');
   console.log('');
   console.log('⌨️  Keyboard shortcuts:');
   console.log('   - C = Toggle point comment mode');
