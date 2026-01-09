@@ -1,12 +1,13 @@
 // ===============================
-// CESIUM BIM VIEWER - FIREBASE AUTH MODULE v1.0
+// CESIUM BIM VIEWER - FIREBASE AUTH MODULE v1.1
 // Simple Email/Password Login Protection
+// FIXED: Now initializes Comments module after login
 // ===============================
 'use strict';
 
 (function() {
   
-  console.log('🔐 Loading Firebase Auth module v1.0...');
+  console.log('🔐 Loading Firebase Auth module v1.1...');
 
   // =====================================
   // FIREBASE AUTH CONFIG
@@ -159,6 +160,23 @@
       if (cesiumContainer) cesiumContainer.style.display = 'block';
       if (toolbar) toolbar.style.display = 'block';
       
+      // ✅ NEU v1.1: Comments-Modul initialisieren nach erfolgreichem Login
+      // Warte kurz, damit BimViewer vollständig geladen ist
+      setTimeout(() => {
+        if (typeof BimViewer !== 'undefined' && typeof BimViewer.initFirebase === 'function') {
+          console.log('🔐 Initializing Comments module after login...');
+          BimViewer.initFirebase();
+        } else {
+          console.warn('⚠️ BimViewer.initFirebase not available yet, retrying...');
+          // Retry nach weiteren 500ms
+          setTimeout(() => {
+            if (typeof BimViewer !== 'undefined' && typeof BimViewer.initFirebase === 'function') {
+              BimViewer.initFirebase();
+            }
+          }, 500);
+        }
+      }, 100);
+      
       // Show all other UI elements
       document.querySelectorAll('.mode-indicator, .status-indicator, #commentDialog, #infoBoxCustom').forEach(el => {
         // Don't change display, just allow them to be shown when needed
@@ -227,6 +245,35 @@
     // Check if logged in
     isLoggedIn: function() {
       return this.currentUser !== null;
+    },
+    
+    // ✅ NEU v1.1: Passwort zurücksetzen
+    resetPassword: async function(email) {
+      if (!email) {
+        this.showError('Bitte E-Mail-Adresse eingeben');
+        return false;
+      }
+      
+      try {
+        await firebase.auth().sendPasswordResetEmail(email);
+        alert('Passwort-Reset E-Mail wurde gesendet!');
+        return true;
+      } catch (error) {
+        console.error('❌ Password reset error:', error);
+        
+        let message = 'Fehler beim Zurücksetzen';
+        switch(error.code) {
+          case 'auth/user-not-found':
+            message = 'E-Mail-Adresse nicht gefunden';
+            break;
+          case 'auth/invalid-email':
+            message = 'Ungültige E-Mail-Adresse';
+            break;
+        }
+        
+        this.showError(message);
+        return false;
+      }
     }
   };
 
@@ -259,11 +306,12 @@
     }, 100);
   });
 
-  console.log('✅ Firebase Auth module loaded');
+  console.log('✅ Firebase Auth module loaded (v1.1)');
   console.log('💡 Usage:');
   console.log('   - BimAuth.login(email, password)');
   console.log('   - BimAuth.logout()');
   console.log('   - BimAuth.getCurrentUser()');
   console.log('   - BimAuth.isLoggedIn()');
+  console.log('   - BimAuth.resetPassword(email)');
 
 })();

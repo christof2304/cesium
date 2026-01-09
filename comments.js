@@ -1,14 +1,14 @@
 // ===============================
-// CESIUM BIM VIEWER - COMMENTS MODULE (v4.2 - WITH TOGGLE & DELETE ALL)
+// CESIUM BIM VIEWER - COMMENTS MODULE (v4.3 - FIREBASE FIX)
 // 3D Comment/Annotation System with Point & Area Support
 // NO LEFT-CLICK CONFLICT!
-// VERSION: 4.2 - 2024-11-03 - With toggleAllCommentsVisibility & deleteAllComments
+// VERSION: 4.3 - FIXED: Firebase initialization check for auth.js compatibility
 // ===============================
 'use strict';
 
 (function() {
   
-  console.log('💬 Loading Comments module v4.2 (WITH TOGGLE & DELETE ALL)...');
+  console.log('💬 Loading Comments module v4.3 (FIREBASE FIX)...');
   console.log('✅ New functions available: toggleAllCommentsVisibility(), deleteAllComments()');
 
   // =====================================
@@ -53,10 +53,11 @@
     areaPoints: [],
     areaPreviewEntities: [],
     areaPolygonEntity: null,
-    areaFinishButton: null, // NEW: Floating finish button
+    areaFinishButton: null,
     comments: [],
     selectedComment: null,
-    allVisible: true // Global visibility toggle for all comments
+    allVisible: true,
+    clickHandlerInitialized: false
   };
 
   // =====================================
@@ -109,10 +110,16 @@
   };
 
   // =====================================
-  // FIREBASE INITIALIZATION
+  // FIREBASE INITIALIZATION (v4.3 FIXED)
   // =====================================
   
   BimViewer.initFirebase = function() {
+    // ✅ FIX: Prüfen ob bereits initialisiert
+    if (this.comments.initialized) {
+      console.log('💬 Comments Firebase already initialized');
+      return true;
+    }
+    
     if (typeof firebase === 'undefined') {
       console.error('❌ Firebase SDK not loaded!');
       this.updateStatus('Firebase SDK not loaded', 'error');
@@ -120,16 +127,33 @@
     }
     
     try {
-      firebase.initializeApp(FIREBASE_CONFIG);
+      // ✅ FIX: Prüfen ob Firebase bereits von auth.js initialisiert wurde
+      if (firebase.apps.length === 0) {
+        firebase.initializeApp(FIREBASE_CONFIG);
+        console.log('✅ Firebase initialized by comments module');
+      } else {
+        console.log('✅ Firebase already initialized (by auth module)');
+      }
+      
+      // ✅ Firestore initialisieren
       this.comments.db = firebase.firestore();
       this.comments.initialized = true;
-      console.log('✅ Firebase initialized for comments');
+      console.log('✅ Firestore ready for comments');
       
+      // ✅ Listener starten
       this.setupCommentsListener();
+      
+      // ✅ Click-Handler initialisieren (falls noch nicht geschehen)
+      if (!this.comments.clickHandlerInitialized) {
+        this.initCommentClickHandler();
+        this.comments.clickHandlerInitialized = true;
+      }
+      
       return true;
+      
     } catch (error) {
       console.error('❌ Firebase initialization error:', error);
-      this.updateStatus('Firebase initialization failed', 'error');
+      this.updateStatus('Firebase initialization failed: ' + error.message, 'error');
       return false;
     }
   };
@@ -139,7 +163,10 @@
   // =====================================
   
   BimViewer.setupCommentsListener = function() {
-    if (!this.comments.initialized) return;
+    if (!this.comments.initialized) {
+      console.warn('⚠️ Cannot setup listener - Firebase not initialized');
+      return;
+    }
     
     let isFirstLoad = true;
     
@@ -264,10 +291,8 @@
       return;
     }
     
-    // Toggle visibility state
     this.comments.allVisible = !this.comments.allVisible;
     
-    // Update all comment entities
     this.comments.comments.forEach(comment => {
       const entity = this.viewer.entities.getById(comment.id);
       if (entity) {
@@ -279,7 +304,6 @@
     this.updateStatus(`All comments ${status}`, 'success');
     console.log(`👁️ All comments ${status}`);
     
-    // Update button state
     const toggleBtn = document.getElementById('toggleAllCommentsBtn');
     if (toggleBtn) {
       toggleBtn.textContent = this.comments.allVisible ? '👁️ Hide All' : '👁️ Show All';
@@ -310,7 +334,6 @@
     try {
       this.updateStatus('Deleting all comments...', 'loading');
       
-      // Delete all comments from Firebase
       const batch = this.comments.db.batch();
       
       this.comments.comments.forEach(comment => {
@@ -320,7 +343,6 @@
       
       await batch.commit();
       
-      // Remove all entities from viewer
       this.comments.comments.forEach(comment => {
         this.viewer.entities.removeById(comment.id);
       });
@@ -355,7 +377,6 @@
       comment.height
     );
     
-    // ✅ HIGH RESOLUTION SVG: 128x160 pixels (4x larger for crisp display)
     const highResSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="128" height="160" viewBox="0 0 128 160">
         <defs>
@@ -384,32 +405,27 @@
       
       billboard: {
         image: 'data:image/svg+xml;base64,' + btoa(highResSvg),
-        scale: 0.5, // Start smaller, scale by distance will handle the rest
+        scale: 0.5,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         heightReference: Cesium.HeightReference.CLAMP_TO_3D_TILE,
-        // ✅ Scale by distance for better visibility at all zoom levels
         scaleByDistance: new Cesium.NearFarScalar(10, 1.0, 500, 0.3)
       },
       
       label: {
         text: comment.title,
-        // ✅ EXTRA LARGE FONT: 26px for maximum sharpness
         font: 'bold 26px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 4, // ✅ Extra thick outline for better readability
+        outlineWidth: 4,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -60),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         heightReference: Cesium.HeightReference.CLAMP_TO_3D_TILE,
-        // ✅ Larger base scale for better readability
         scale: 1.0,
         scaleByDistance: new Cesium.NearFarScalar(10, 1.4, 500, 0.6),
-        // ✅ Adjust pixel offset by distance for better positioning
         pixelOffsetScaleByDistance: new Cesium.NearFarScalar(10, 1.0, 500, 0.6),
-        // ✅ Larger background for better text contrast
         showBackground: true,
         backgroundColor: new Cesium.Color(0, 0, 0, 0.85),
         backgroundPadding: new Cesium.Cartesian2(14, 8)
@@ -418,7 +434,7 @@
       description: this.createCommentDescription(comment)
     });
     
-    console.log(`📍 Point comment entity added: ${comment.title} (HIGH-RES)`);
+    console.log(`📍 Point comment entity added: ${comment.title}`);
   };
 
   // =====================================
@@ -435,8 +451,7 @@
     const color = priorityColors[comment.priority] || '#5ac';
     const cesiumColor = Cesium.Color.fromCssColorString(color);
     
-    // ✅ MINIMAL OFFSET: Just 2cm to prevent Z-fighting without visible displacement
-    const OFFSET_HEIGHT = 0.02; // meters above surface (2 centimeters)
+    const OFFSET_HEIGHT = 0.02;
     
     const positions = comment.areaPoints.map(point => {
       const cartographic = Cesium.Cartographic.fromDegrees(point.lon, point.lat, point.height + OFFSET_HEIGHT);
@@ -445,42 +460,32 @@
     
     const centerCart = Cesium.BoundingSphere.fromPoints(positions).center;
     
-    // ✅ MEASUREMENT SDK STYLE: Use Polygon with filled area instead of just polyline
     this.viewer.entities.add({
       id: comment.id,
       polygon: {
         hierarchy: positions,
-        // ✅ Semi-transparent fill like Measurement SDK
         material: cesiumColor.withAlpha(0.5),
         outline: true,
         outlineColor: cesiumColor,
         outlineWidth: 3,
-        // ✅ Use perPositionHeight instead of heightReference to avoid warnings
-        perPositionHeight: true,
-        // ✅ No heightReference - we're using absolute positions with offset
-        // ✅ No classificationType - causes conflicts with outlines
+        perPositionHeight: true
       },
       
       position: centerCart,
       
       label: {
         text: `📐 ${comment.title}`,
-        // ✅ EXTRA LARGE FONT: 28px for maximum sharpness
         font: 'bold 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 4, // ✅ Extra thick outline for better readability
+        outlineWidth: 4,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         pixelOffset: new Cesium.Cartesian2(0, 0),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        // ✅ Removed heightReference - using absolute position with offset
-        // ✅ Larger base scale
         scale: 1.0,
         scaleByDistance: new Cesium.NearFarScalar(10, 1.5, 500, 0.6),
-        // ✅ Adjust pixel offset by distance for better positioning
         pixelOffsetScaleByDistance: new Cesium.NearFarScalar(10, 1.0, 500, 0.6),
-        // ✅ Larger background for better text contrast
         backgroundColor: cesiumColor.withAlpha(0.9),
         backgroundPadding: new Cesium.Cartesian2(14, 8),
         showBackground: true
@@ -489,7 +494,7 @@
       description: this.createCommentDescription(comment)
     });
     
-    console.log(`📐 Area annotation entity added (POLYGON): ${comment.title} (${comment.areaPoints.length} points)`);
+    console.log(`📐 Area annotation entity added: ${comment.title} (${comment.areaPoints.length} points)`);
   };
 
   // =====================================
@@ -499,8 +504,6 @@
   BimViewer.calculatePolygonArea = function(positions) {
     if (!positions || positions.length < 3) return 0;
     
-    // Simple area calculation using Shoelace formula
-    // Convert to geographic coordinates
     const coords = positions.map(pos => {
       const cartographic = Cesium.Cartographic.fromCartesian(pos);
       return {
@@ -509,7 +512,6 @@
       };
     });
     
-    // Calculate area using Shoelace formula
     let area = 0;
     for (let i = 0; i < coords.length; i++) {
       const j = (i + 1) % coords.length;
@@ -518,12 +520,10 @@
     }
     area = Math.abs(area) / 2.0;
     
-    // Convert from degrees squared to square meters
-    // Approximate conversion (more accurate near equator)
     const avgLat = coords.reduce((sum, c) => sum + c.lat, 0) / coords.length;
     const latRad = Cesium.Math.toRadians(avgLat);
-    const metersPerDegreeLat = 111320; // meters per degree latitude
-    const metersPerDegreeLon = 111320 * Math.cos(latRad); // meters per degree longitude
+    const metersPerDegreeLat = 111320;
+    const metersPerDegreeLon = 111320 * Math.cos(latRad);
     
     area = area * metersPerDegreeLat * metersPerDegreeLon;
     
@@ -615,7 +615,6 @@
     
     const position = Cesium.Cartesian3.fromDegrees(lon, lat, height);
     
-    // ✅ HIGH RESOLUTION PREVIEW MARKER: 128x160 pixels
     const highResSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="128" height="160" viewBox="0 0 128 160">
         <defs>
@@ -641,7 +640,7 @@
       position: position,
       billboard: {
         image: 'data:image/svg+xml;base64,' + btoa(highResSvg),
-        scale: 0.6, // Slightly larger for preview visibility
+        scale: 0.6,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         heightReference: Cesium.HeightReference.CLAMP_TO_3D_TILE,
@@ -649,7 +648,6 @@
       },
       label: {
         text: 'New Comment Location',
-        // ✅ EXTRA LARGE FONT: 26px for preview
         font: 'bold 26px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
         fillColor: Cesium.Color.YELLOW,
         outlineColor: Cesium.Color.BLACK,
@@ -681,8 +679,7 @@
   // =====================================
   
   BimViewer.addAreaPoint = function(lon, lat, height) {
-    // ✅ MINIMAL OFFSET: Just 2cm to match polygon offset
-    const OFFSET_HEIGHT = 0.02; // meters above surface (2 centimeters)
+    const OFFSET_HEIGHT = 0.02;
     
     this.comments.areaPoints.push({ lon, lat, height });
     
@@ -692,17 +689,15 @@
     const pointEntity = this.viewer.entities.add({
       position: position,
       point: {
-        pixelSize: 14, // ✅ Larger point for better visibility
+        pixelSize: 14,
         color: Cesium.Color.YELLOW,
         outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 3, // ✅ Thicker outline
+        outlineWidth: 3,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        // ✅ Remove heightReference to use absolute position
         scaleByDistance: new Cesium.NearFarScalar(10, 1.5, 500, 0.5)
       },
       label: {
         text: `${this.comments.areaPoints.length}`,
-        // ✅ LARGER FONT: 22px for area point numbers
         font: 'bold 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
@@ -710,7 +705,6 @@
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -25),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        // ✅ Removed heightReference to use absolute position with offset
         scale: 1.0,
         scaleByDistance: new Cesium.NearFarScalar(10, 1.4, 500, 0.7),
         pixelOffsetScaleByDistance: new Cesium.NearFarScalar(10, 1.0, 500, 0.7),
@@ -727,7 +721,7 @@
       this.showAreaFinishButton();
     }
     
-    console.log(`📐 Area point ${this.comments.areaPoints.length} added (HIGH-RES)`);
+    console.log(`📐 Area point ${this.comments.areaPoints.length} added`);
   };
 
   BimViewer.updateAreaPolygonPreview = function() {
@@ -735,39 +729,33 @@
       this.viewer.entities.remove(this.comments.areaPolygonEntity);
     }
     
-    // ✅ MINIMAL OFFSET: Just 2cm to prevent Z-fighting without visible displacement
-    const OFFSET_HEIGHT = 0.02; // meters above surface (2 centimeters)
+    const OFFSET_HEIGHT = 0.02;
     
     const positions = this.comments.areaPoints.map(point => {
       const cartographic = Cesium.Cartographic.fromDegrees(point.lon, point.lat, point.height + OFFSET_HEIGHT);
       return Cesium.Cartesian3.fromRadians(cartographic.longitude, cartographic.latitude, cartographic.height);
     });
     
-    // ✅ MEASUREMENT SDK STYLE: Use Polygon with semi-transparent fill for preview
     this.comments.areaPolygonEntity = this.viewer.entities.add({
       polygon: {
         hierarchy: positions,
-        // ✅ Semi-transparent yellow fill like Measurement SDK
         material: Cesium.Color.YELLOW.withAlpha(0.5),
         outline: true,
         outlineColor: Cesium.Color.YELLOW,
         outlineWidth: 3,
-        // ✅ Use perPositionHeight instead of heightReference to avoid warnings
         perPositionHeight: true
-        // ✅ No heightReference - we're using absolute positions with offset
-        // ✅ No classificationType - causes conflicts with outlines
       }
     });
     
-    console.log('📐 Area polyline preview updated');
+    console.log('📐 Area polygon preview updated');
   };
 
   // =====================================
-  // FLOATING "FINISH AREA" BUTTON (NEW v4.1)
+  // FLOATING "FINISH AREA" BUTTON
   // =====================================
   
   BimViewer.showAreaFinishButton = function() {
-    if (this.comments.areaFinishButton) return; // Already showing
+    if (this.comments.areaFinishButton) return;
     
     const button = document.createElement('div');
     button.id = 'areaFinishButton';
@@ -804,7 +792,6 @@
     document.body.appendChild(button);
     this.comments.areaFinishButton = button;
     
-    // Add bounce animation
     const style = document.createElement('style');
     style.textContent = `
       @keyframes bounceIn {
@@ -989,7 +976,6 @@
       toggleBtn.innerHTML = type === 'area' ? '📐 Add Area' : '💬 Add Comment';
     }
     
-    // Update indicator if active
     const indicator = document.getElementById('commentModeIndicator');
     if (indicator && this.comments.isAddingComment) {
       if (type === 'area') {
@@ -1138,11 +1124,11 @@
   };
 
   // =====================================
-  // CLICK HANDLER (v4.1 - RIGHT-CLICK ONLY)
+  // CLICK HANDLER (RIGHT-CLICK ONLY)
   // =====================================
   
   BimViewer.initCommentClickHandler = function() {
-    console.log('💬 Initializing RIGHT-CLICK-only comment handler (v4.1)...');
+    console.log('💬 Initializing RIGHT-CLICK-only comment handler (v4.3)...');
     
     const handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
     
@@ -1192,9 +1178,6 @@
     }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
     
     console.log('✅ RIGHT-CLICK-only handler installed!');
-    console.log('💡 Point mode: 1x RIGHT-CLICK → Dialog opens');
-    console.log('💡 Area mode: 3+ RIGHT-CLICKS → Press ENTER or click "Finish Area"');
-    console.log('💡 LEFT-CLICK remains free for IFC element selection');
   };
 
   // =====================================
@@ -1206,13 +1189,11 @@
     
     const key = event.key.toLowerCase();
     
-    // C = Toggle point comment mode
     if (key === 'c' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault();
       BimViewer.toggleCommentMode();
     }
     
-    // A = Toggle area annotation mode
     if (key === 'a' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault();
       BimViewer.setAnnotationType('area');
@@ -1221,13 +1202,11 @@
       }
     }
     
-    // ENTER = Finish area annotation (NEW v4.1)
     if (key === 'enter' && BimViewer.comments.annotationType === 'area' && BimViewer.comments.areaPoints.length >= 3) {
       event.preventDefault();
       BimViewer.finishAreaAnnotation();
     }
     
-    // ESC = Close dialog or cancel area
     if (key === 'escape') {
       event.preventDefault();
       if (BimViewer.comments.areaPoints.length > 0) {
@@ -1244,14 +1223,12 @@
   // INITIALIZATION
   // =====================================
   
-  console.log('✅ Comments module loaded (v4.1 - RIGHT-CLICK ONLY)');
+  console.log('✅ Comments module loaded (v4.3 - FIREBASE FIX)');
   console.log('');
-  console.log('💡 NEW in v4.1:');
-  console.log('   ✅ Point comments (💬): 1x RIGHT-CLICK → Dialog opens');
-  console.log('   ✅ Area annotations (📐): 3+ RIGHT-CLICKS → ENTER or "Finish Area" button');
-  console.log('   ✅ LEFT-CLICK remains FREE for IFC element selection');
-  console.log('   ✅ Floating "Finish Area" button appears when ready');
-  console.log('   ✅ Both types use CLAMP_TO_3D_TILE');
+  console.log('💡 NEW in v4.3:');
+  console.log('   ✅ FIXED: Firebase initialization now works with auth.js');
+  console.log('   ✅ Firebase is initialized AFTER successful login');
+  console.log('   ✅ No more "Firebase not initialized" errors');
   console.log('');
   console.log('⌨️  Keyboard shortcuts:');
   console.log('   - C = Toggle point comment mode');
