@@ -1,18 +1,19 @@
 // ===============================
-// CESIUM BIM VIEWER - CORE MODULE (v3.3 - iTwin Integration)
+// CESIUM BIM VIEWER - CORE MODULE (v3.3.2 - Dynamic Ion Token)
 // Main viewer initialization and asset management
-// Version: 3.3 - Added iTwin Platform support with Share Keys
+// Version: 3.3.2 - Ion Token now comes from auth.js (user input)
 // ===============================
 'use strict';
 
-console.log('🔧 Loading core.js v3.3.1 - Globe Fix for Cesium 1.134');
+console.log('🔧 Loading core.js v3.3.2 - Dynamic Ion Token');
 
 // ===============================
 // CONFIGURATION
 // ===============================
 const CONFIG = {
   cesium: {
-    ION_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlMDkwZDM4OC00NzRhLTQyMmYtOTI2ZS02NGZiM2Q2MTE2OGMiLCJpZCI6MjYzNTkwLCJpYXQiOjE3NDExNzk0MTB9.jnf8NDf2PoydWpK3mwDkbp8IYIif5T_-Ioy3Bx6n3Cc',
+    // ✅ REMOVED: Hardcoded ION_TOKEN - now comes from auth.js via user input
+    // Token is set dynamically in init() via BimAuth.getIonToken()
     IMAGERY_ASSET_ID: 3830182,
     GOOGLE_3D_TILES_ASSET_ID: 2275207,
     OSM_BUILDINGS_ASSET_ID: 96188
@@ -22,9 +23,9 @@ const CONFIG = {
     DEFAULT_POSITION: {
       longitude: 10.9544,
       latitude: 50.7323,
-      height: 10000000,  // 10 Millionen Meter für sicheren Globe-View (nicht zu extrem)
+      height: 10000000,
       heading: 0,
-      pitch: -89  // -89° für Top-Down Ansicht (nicht exakt -90° wegen Gimbal Lock)
+      pitch: -89
     }
   },
   
@@ -166,21 +167,18 @@ const BimViewer = {
   nextAssetId: 1,
   firstAssetLoaded: false,
   
-  // ✅ NEW: Improved terrain management
   terrain: {
     worldTerrain: null,
     ellipsoid: null,
-    current: 'worldTerrain' // 'worldTerrain', 'ellipsoid', or null
+    current: 'worldTerrain'
   },
   
-  // ✅ IMPROVED: Better Google Tiles management
   googleTiles: {
     tileset: null,
     enabled: false,
     isLoading: false
   },
   
-  // ✅ IMPROVED: Better OSM Buildings management
   osmBuildings: {
     tileset: null,
     enabled: true,
@@ -221,19 +219,26 @@ const BimViewer = {
   },
 
   async init() {
-    console.log('🚀 Initializing BIM Viewer v3.3.1 (Globe Fix for Cesium 1.134)...');
+    console.log('🚀 Initializing BIM Viewer v3.3.2 (Dynamic Ion Token)...');
     
     try {
-      Cesium.Ion.defaultAccessToken = CONFIG.cesium.ION_TOKEN;
+      // ✅ NEW: Get Ion Token from auth.js (user input)
+      const ionToken = BimAuth.getIonToken();
       
-      // ✅ WORKING SOLUTION: Use the initialization from your old core.js
-      // Key: baseLayerPicker: true creates automatic base imagery layers!
-      console.log('🌍 Loading Cesium World Terrain (Working Method)...');
+      if (!ionToken) {
+        console.error('❌ No Cesium Ion Token available!');
+        this.updateStatus('No Ion Token - please login and enter token', 'error');
+        return;
+      }
+      
+      Cesium.Ion.defaultAccessToken = ionToken;
+      console.log('✅ Ion Token applied from user input');
+      
+      console.log('🌍 Loading Cesium World Terrain...');
       
       this.viewer = new Cesium.Viewer('cesiumContainer', {
-        // ✅ MODERN: Terrain directly in constructor (Cesium 1.104+)
         terrain: Cesium.Terrain.fromWorldTerrain(),
-        baseLayerPicker: true,  // ✅ CRITICAL: This creates default imagery layers!
+        baseLayerPicker: true,
         geocoder: true,
         homeButton: true,
         sceneModePicker: true,
@@ -263,55 +268,39 @@ const BimViewer = {
         maximumRenderTimeChange: Infinity
       });
       
-      console.log('✅ Viewer created with World Terrain (Working Method from your old core.js)');
+      console.log('✅ Viewer created with World Terrain');
       
-      // ✅ Add Rendering Error Handler to catch Property/Semantic errors
       this.viewer.scene.renderError.addEventListener((scene, error) => {
         console.error('🔴 Cesium Rendering Error:', error);
-        console.error('   Error Type:', error.name);
-        console.error('   Message:', error.message);
         
-        // Check if it's a property-related error
         if (error.message && error.message.includes('propertiesBySemantic')) {
           console.warn('⚠️ Property/Semantic error detected - attempting to continue rendering...');
-          console.warn('   This asset may have invalid or missing property definitions.');
-          console.warn('   The asset will still be visible but some features may not work.');
         }
         
-        // Attempt to restart rendering
         try {
-          console.log('🔄 Attempting to restart rendering...');
           scene.requestRender();
           this.updateStatus('Rendering error occurred - attempting recovery', 'error');
         } catch (restartError) {
           console.error('❌ Failed to restart rendering:', restartError);
-          this.updateStatus('Critical rendering error - page reload may be required', 'error');
         }
       });
       
-      console.log('✅ Rendering error handler installed');
-      
-      // ✅ Store reference to terrain (already loaded by viewer)
       this.terrain.worldTerrain = this.viewer.scene.terrain;
       this.terrain.current = 'worldTerrain';
-      
-      // ✅ Create ellipsoid terrain provider for fallback
       this.terrain.ellipsoid = new Cesium.EllipsoidTerrainProvider();
       
-      // ✅ Add your Bing Aerial Maps (Asset ID 2) as additional layer
       try {
-        console.log('📷 Loading Bing Aerial Maps (Asset ID 2)...');
+        console.log('📷 Loading Bing Aerial Maps...');
         const bingImagery = await Cesium.IonImageryProvider.fromAssetId(2);
         this.viewer.imageryLayers.addImageryProvider(bingImagery);
         console.log('✅ Bing Aerial Maps added successfully');
       } catch (error) {
-        console.warn('⚠️ Could not load Bing Maps, trying fallback:', error.message);
+        console.warn('⚠️ Could not load Bing Maps:', error.message);
         try {
           const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(CONFIG.cesium.IMAGERY_ASSET_ID);
           this.viewer.imageryLayers.addImageryProvider(imageryProvider);
-          console.log('✅ Fallback imagery added');
         } catch (fallbackError) {
-          console.warn('⚠️ Using OSM imagery as last resort');
+          console.warn('⚠️ Using OSM imagery as fallback');
           this.viewer.imageryLayers.addImageryProvider(
             new Cesium.OpenStreetMapImageryProvider({
               url: 'https://a.tile.openstreetmap.org/'
@@ -322,37 +311,23 @@ const BimViewer = {
 
       const scene = this.viewer.scene;
       
-      // ✅ CRITICAL: Ensure globe is visible
       scene.globe.show = true;
       scene.globe.enableLighting = true;
       scene.globe.depthTestAgainstTerrain = true;
-      
-      // ✅ CRITICAL: Ensure sky and atmosphere are visible
       scene.skyBox.show = true;
       scene.skyAtmosphere.show = true;
-      
-      // ✅ CRITICAL: Ensure scene lighting
       scene.sun.show = true;
       scene.moon.show = true;
       
-      console.log('✅ Globe, sky, and atmosphere configured and enabled');
-      console.log(`   - Globe visible: ${scene.globe.show}`);
-      console.log(`   - SkyBox visible: ${scene.skyBox.show}`);
-      console.log(`   - Atmosphere visible: ${scene.skyAtmosphere.show}`);
-      console.log(`   - Imagery Layers: ${this.viewer.imageryLayers.length}`);
+      console.log('✅ Globe, sky, and atmosphere configured');
       
-      // With baseLayerPicker: true, we should always have imagery layers
-      // Only apply emergency fix if something is really wrong
       setTimeout(() => {
         const layerCount = this.viewer.imageryLayers.length;
-        console.log(`🔍 Verifying imagery layers: ${layerCount}`);
-        
         if (layerCount === 0) {
-          console.error('❌ CRITICAL: No imagery layers despite baseLayerPicker: true!');
-          console.warn('⚠️ Applying emergency fix...');
+          console.error('❌ No imagery layers!');
           this.fixGlobeVisibility();
         } else {
-          console.log(`✅ Globe working correctly (${layerCount} layer(s) loaded)`);
+          console.log(`✅ Globe working correctly (${layerCount} layer(s))`);
         }
       }, 1000);
       
@@ -363,7 +338,6 @@ const BimViewer = {
       console.log('✅ BIM Viewer initialized successfully');
       this.updateStatus('BIM Viewer ready', 'success');
       
-      // Initialize Ion Measurements if available
       if (typeof this.initIonMeasurements === 'function') {
         this.initIonMeasurements();
       }
@@ -388,40 +362,29 @@ const BimViewer = {
   },
 
   async toggleGoogle3DTiles() {
-    if (this.googleTiles.isLoading) {
-      console.log('⏳ Google 3D Tiles already loading...');
-      return;
-    }
+    if (this.googleTiles.isLoading) return;
 
     if (!this.googleTiles.tileset) {
       try {
         this.googleTiles.isLoading = true;
         this.updateStatus('Loading Google 3D Tiles...', 'loading');
-        console.log('🌍 Loading Google 3D Tiles...');
         
         const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(CONFIG.cesium.GOOGLE_3D_TILES_ASSET_ID);
-        
         this.viewer.scene.primitives.add(tileset);
-        
-        // ⭐ Enable lighting for Google 3D Tiles
         this.enableTilesetLighting(tileset);
         
         this.googleTiles.tileset = tileset;
         this.googleTiles.enabled = true;
         this.googleTiles.isLoading = false;
         
-        // ✅ IMPORTANT: When Google 3D Tiles is enabled, hide globe and imagery
         this.viewer.scene.globe.show = false;
         
-        // ✅ Also hide OSM Buildings if loaded
         if (this.osmBuildings.tileset) {
           this.osmBuildings.tileset.show = false;
           this.osmBuildings.enabled = false;
         }
         
-        console.log('✅ Google 3D Tiles loaded successfully');
-        console.log('   - Globe hidden (using Google 3D Tiles as base)');
-        console.log('   - OSM Buildings hidden');
+        console.log('✅ Google 3D Tiles loaded');
         this.updateStatus('Google 3D Tiles enabled', 'success');
         
       } catch (error) {
@@ -430,53 +393,31 @@ const BimViewer = {
         this.updateStatus('Failed to load Google 3D Tiles', 'error');
       }
     } else {
-      // Toggle existing tileset
       this.googleTiles.enabled = !this.googleTiles.enabled;
       this.googleTiles.tileset.show = this.googleTiles.enabled;
       
       if (this.googleTiles.enabled) {
-        // ✅ Enabling Google 3D Tiles: Hide globe and imagery
         this.viewer.scene.globe.show = false;
-        
-        // Hide OSM Buildings
         if (this.osmBuildings.tileset) {
           this.osmBuildings.tileset.show = false;
           this.osmBuildings.enabled = false;
         }
-        
-        console.log('🌍 Google 3D Tiles enabled');
-        console.log('   - Globe hidden');
-        console.log('   - OSM Buildings hidden');
-        
       } else {
-        // ✅ Disabling Google 3D Tiles: Show globe and imagery again
         this.viewer.scene.globe.show = true;
-        
-        // Re-enable OSM Buildings if it was loaded before
         if (this.osmBuildings.tileset) {
           this.osmBuildings.tileset.show = true;
           this.osmBuildings.enabled = true;
         }
-        
-        console.log('🌍 Google 3D Tiles disabled');
-        console.log('   - Globe shown');
-        console.log('   - OSM Buildings shown');
       }
       
-      const status = this.googleTiles.enabled ? 'enabled' : 'disabled';
-      this.updateStatus(`Google 3D Tiles ${status}`, 'success');
+      this.updateStatus(`Google 3D Tiles ${this.googleTiles.enabled ? 'enabled' : 'disabled'}`, 'success');
     }
   },
 
   async toggleOSMBuildings() {
-    if (this.osmBuildings.isLoading) {
-      console.log('⏳ OSM Buildings already loading...');
-      return;
-    }
+    if (this.osmBuildings.isLoading) return;
 
-    // ✅ CHECK: Don't enable OSM Buildings if Google 3D Tiles is active
     if (this.googleTiles.enabled && this.googleTiles.tileset && this.googleTiles.tileset.show) {
-      console.warn('⚠️ Google 3D Tiles is active - OSM Buildings should not be used simultaneously');
       this.updateStatus('Disable Google 3D Tiles first', 'warning');
       return;
     }
@@ -485,20 +426,16 @@ const BimViewer = {
       try {
         this.osmBuildings.isLoading = true;
         this.updateStatus('Loading OSM Buildings...', 'loading');
-        console.log('🏢 Loading OSM Buildings...');
         
         const tileset = await Cesium.createOsmBuildingsAsync();
-        
         this.viewer.scene.primitives.add(tileset);
-        
-        // ⭐ Enable lighting for OSM Buildings
         this.enableTilesetLighting(tileset);
         
         this.osmBuildings.tileset = tileset;
         this.osmBuildings.enabled = true;
         this.osmBuildings.isLoading = false;
         
-        console.log('✅ OSM Buildings loaded successfully');
+        console.log('✅ OSM Buildings loaded');
         this.updateStatus('OSM Buildings enabled', 'success');
         
       } catch (error) {
@@ -509,16 +446,15 @@ const BimViewer = {
     } else {
       this.osmBuildings.enabled = !this.osmBuildings.enabled;
       this.osmBuildings.tileset.show = this.osmBuildings.enabled;
-      
-      const status = this.osmBuildings.enabled ? 'enabled' : 'disabled';
-      console.log(`🏢 OSM Buildings ${status}`);
-      this.updateStatus(`OSM Buildings ${status}`, 'success');
+      this.updateStatus(`OSM Buildings ${this.osmBuildings.enabled ? 'enabled' : 'disabled'}`, 'success');
     }
   },
 
   async fetchAvailableAssets() {
     try {
-      const response = await fetch(`https://api.cesium.com/v1/assets?access_token=${CONFIG.cesium.ION_TOKEN}`);
+      // ✅ Use token from auth.js
+      const ionToken = BimAuth.getIonToken();
+      const response = await fetch(`https://api.cesium.com/v1/assets?access_token=${ionToken}`);
       const data = await response.json();
       this.availableAssets = data.items || [];
       return this.availableAssets;
@@ -547,7 +483,6 @@ const BimViewer = {
         cullWithChildrenBounds: true
       });
 
-      // ✅ Add error handler for this specific tileset (with safety checks)
       if (tileset && tileset.tileLoadProgressEvent) {
         tileset.tileLoadProgressEvent.addEventListener((length) => {
           if (length === 0) {
@@ -559,13 +494,10 @@ const BimViewer = {
       if (tileset && tileset.tileFailed) {
         tileset.tileFailed.addEventListener((error) => {
           console.warn(`⚠️ Tile loading failed for asset ${assetId}:`, error);
-          // Don't stop rendering, just log the error
         });
       }
 
       this.viewer.scene.primitives.add(tileset);
-      
-      // ⭐ Enable lighting for this tileset
       this.enableTilesetLighting(tileset);
       
       const assetData = {
@@ -575,34 +507,24 @@ const BimViewer = {
         visible: true,
         opacity: 1.0,
         type: '3DTILES',
-        ifcPropertyName: undefined  // Will be auto-detected
+        ifcPropertyName: undefined
       };
       
       this.loadedAssets.set(assetId.toString(), assetData);
       await tileset.readyPromise;
 
-      // Apply IFC filter early (will detect properties automatically)
       if (typeof this.applyIFCFilter === 'function') {
         await this.applyIFCFilter();
       }
       
-      // Apply point cloud settings if this is a point cloud tileset
       if (typeof this.isPointCloudTileset === 'function' && typeof this.applyPointCloudSettings === 'function') {
         if (this.isPointCloudTileset(tileset)) {
-          console.log(`☁️ Detected point cloud tileset - Applying point cloud settings...`);
           this.applyPointCloudSettings(tileset);
-          console.log(`✅ Point cloud settings applied to asset ${assetId}`);
         }
       }
       
-      
-      // Update Z-Offset assets list (with delay to ensure modules are loaded)
       if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
-        setTimeout(() => {
-          if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
-            BimViewer.updateZOffsetAssetsList();
-          }
-        }, 100);
+        setTimeout(() => BimViewer.updateZOffsetAssetsList(), 100);
       }
 
       if (window.BimViewerUI && typeof BimViewerUI.createAssetControls === 'function') {
@@ -616,44 +538,25 @@ const BimViewer = {
       
       this.updateStatus(`Asset loaded: ${assetData.name}`, 'success');
       
-      // ✅ CRITICAL: Ensure globe stays visible after asset load
       this.viewer.scene.globe.show = true;
       this.viewer.scene.skyBox.show = true;
       this.viewer.scene.skyAtmosphere.show = true;
       
-      // Auto-detect IFC properties after asset is fully loaded
-      console.log(`🤖 [Auto-Detect] Starting IFC property detection for asset ${assetId}...`);
-      
       setTimeout(async () => {
         try {
           if (typeof this.detectIFCProperties === 'function') {
-            console.log(`🔍 [Auto-Detect] Detecting IFC properties for asset ${assetId}...`);
-            
             const detectedProp = await this.detectIFCProperties(assetData.tileset);
-            
             if (detectedProp) {
               assetData.ifcPropertyName = detectedProp;
-              console.log(`✅ [Auto-Detect] Asset ${assetId}: IFC property "${detectedProp}" detected!`);
-              
-              // Apply filter with detected property
               if (typeof this.applyIFCFilter === 'function') {
-                console.log(`🎨 [Auto-Detect] Applying IFC filter for asset ${assetId}...`);
                 await this.applyIFCFilter();
-                console.log(`✅ [Auto-Detect] IFC filter applied successfully!`);
               }
-            } else {
-              console.log(`ℹ️ [Auto-Detect] Asset ${assetId}: No IFC properties found`);
-              assetData.ifcPropertyName = null;
             }
-          } else {
-            console.warn(`⚠️ [Auto-Detect] detectIFCProperties function not available yet`);
-            console.warn(`⚠️ Make sure features.js is loaded before loading assets`);
           }
         } catch (detectError) {
-          console.error(`❌ [Auto-Detect] Detection failed for asset ${assetId}:`, detectError);
-          assetData.ifcPropertyName = null;
+          console.error(`❌ Detection failed for asset ${assetId}:`, detectError);
         }
-      }, 3000); // Wait 3 seconds for tiles to fully load
+      }, 3000);
       
     } catch (error) {
       console.error('Failed to load asset:', error);
@@ -661,14 +564,12 @@ const BimViewer = {
     }
   },
 
-  // ✅ NEW: Load iTwin Model with Share Key
   async loadITwinModel(shareKey, iModelId, modelName = null) {
     if (!shareKey || !iModelId) {
       this.updateStatus('❌ Share Key and iModel ID required', 'error');
       return;
     }
 
-    // Check if already loaded
     const assetKey = `itwin_${iModelId}`;
     if (this.loadedAssets.has(assetKey)) {
       this.updateStatus('⚠️ Model already loaded', 'warning');
@@ -676,70 +577,51 @@ const BimViewer = {
     }
 
     try {
-      this.updateStatus(`Loading iTwin Model ${iModelId.substring(0, 8)}...`, 'loading');
-      console.log(`🏗️ Loading iTwin Model: ${iModelId}`);
-      console.log(`🔑 Using Share Key: ${shareKey.substring(0, 20)}...`);
+      this.updateStatus(`Loading iTwin Model...`, 'loading');
       
-      // ✅ IMPORTANT: Set the share key for this specific iTwin
       Cesium.ITwinPlatform.defaultShareKey = shareKey;
       
-      // Load the iModel
       const tileset = await Cesium.ITwinData.createTilesetFromIModelId({
         iModelId: iModelId
       });
       
       if (!tileset) {
-        throw new Error('Tileset could not be created - check iModel ID and permissions');
+        throw new Error('Tileset could not be created');
       }
       
-      // Apply settings
       tileset.colorBlendMode = Cesium.Cesium3DTileColorBlendMode.REPLACE;
-      
-      // Add to scene
       this.viewer.scene.primitives.add(tileset);
-      
-      // ⭐ Enable lighting for this tileset
       this.enableTilesetLighting(tileset);
       
-      // Wait for ready, then fly to it
       await tileset.readyPromise;
       
       const assetData = {
         id: assetKey,
-        name: modelName || `🏗️ iTwin Model (${iModelId.substring(0, 8)}...)`,
+        name: modelName || `🏗️ iTwin Model`,
         tileset: tileset,
         visible: true,
         opacity: 1.0,
         type: 'ITWIN',
         iModelId: iModelId,
-        shareKey: shareKey, // Store share key for reference
+        shareKey: shareKey,
         ifcPropertyName: undefined
       };
       
       this.loadedAssets.set(assetKey, assetData);
       
-      // Update Z-Offset assets list (with delay to ensure modules are loaded)
       if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
-        setTimeout(() => {
-          if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
-            BimViewer.updateZOffsetAssetsList();
-          }
-        }, 100);
+        setTimeout(() => BimViewer.updateZOffsetAssetsList(), 100);
       }
       
-      
-      // ✅ FIX: Fly to model after it's ready
       this.viewer.flyTo(tileset, {
         duration: 2.0,
         offset: new Cesium.HeadingPitchRange(0, -0.5, 500)
       });
       
-      // Apply IFC filter if available
       if (typeof this.applyIFCFilter === 'function') {
         setTimeout(() => this.applyIFCFilter(), 1000);
       }
       
-      // Create UI controls
       if (window.BimViewerUI && typeof BimViewerUI.createAssetControls === 'function') {
         BimViewerUI.createAssetControls(assetKey);
       }
@@ -748,72 +630,31 @@ const BimViewer = {
         this.firstAssetLoaded = true;
       }
       
-      console.log(`✅ iTwin Model ${iModelId} loaded successfully`);
-      this.updateStatus(`✅ iTwin Model loaded successfully`, 'success');
+      this.updateStatus(`✅ iTwin Model loaded`, 'success');
       
-      // ✅ CRITICAL: Ensure globe stays visible after model load
       this.viewer.scene.globe.show = true;
       this.viewer.scene.skyBox.show = true;
       this.viewer.scene.skyAtmosphere.show = true;
-      console.log('🌍 Globe visibility restored after iTwin model load');
       
-      // Auto-detect IFC properties
       setTimeout(async () => {
         try {
           if (typeof this.detectIFCProperties === 'function') {
-            console.log(`🔍 [iTwin Auto-Detect] Detecting IFC properties...`);
             const detectedProp = await this.detectIFCProperties(tileset);
-            
             if (detectedProp) {
               assetData.ifcPropertyName = detectedProp;
-              console.log(`✅ [iTwin Auto-Detect] IFC property "${detectedProp}" detected!`);
-              
               if (typeof this.applyIFCFilter === 'function') {
                 await this.applyIFCFilter();
               }
-            } else {
-              console.log(`ℹ️ [iTwin Auto-Detect] No IFC properties found`);
             }
           }
         } catch (error) {
-          console.error(`❌ [iTwin Auto-Detect] Detection failed:`, error);
+          console.error(`❌ iTwin detection failed:`, error);
         }
       }, 3000);
       
     } catch (error) {
       console.error('❌ iTwin Model import error:', error);
-      console.log(`🔍 Debug Info:
-        - iModel ID: ${iModelId}
-        - Share Key Available: ${shareKey ? 'YES' : 'NO'}
-        - Error Type: ${error.name}
-        - Error Message: ${error.message}`);
-      
-      let errorMessage = 'iTwin import failed';
-      let errorDetails = error.message;
-      
-      if (error.message.includes('unauthorized') || error.message.includes('403') || error.message.includes('Forbidden')) {
-        errorMessage = '🔐 Access Denied';
-        errorDetails = 'Check iTwin Share Key and Model permissions. The model may be private or the share key may be expired.';
-      } else if (error.message.includes('404') || error.message.includes('Not Found')) {
-        errorMessage = '❓ Model Not Found';
-        errorDetails = 'iModel ID not found. Check if the ID is correct and the model exists.';
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        errorMessage = '🌐 Network Error';
-        errorDetails = 'Network connection issue. Check your internet connection and try again.';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = '⏱️ Request Timeout';
-        errorDetails = 'Request timed out. The model may be large or server is busy. Try again later.';
-      } else if (error.message.includes('token') || error.message.includes('key')) {
-        errorMessage = '🔑 Authentication Error';
-        errorDetails = 'Invalid or expired Share Key. Please check your iTwin platform credentials.';
-      }
-      
-      this.updateStatus(`${errorMessage}: ${errorDetails}`, 'error');
-      console.log(`💡 Suggested actions:
-        - Verify iModel ID is correct
-        - Check Share Key expiration
-        - Confirm model permissions
-        - Try again with different model`);
+      this.updateStatus(`iTwin import failed: ${error.message}`, 'error');
     }
   },
 
@@ -827,15 +668,9 @@ const BimViewer = {
     
     this.loadedAssets.delete(assetId.toString());
     
-    // Update Z-Offset assets list (with delay to ensure modules are loaded)
     if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
-      setTimeout(() => {
-        if (typeof BimViewer.updateZOffsetAssetsList === 'function') {
-          BimViewer.updateZOffsetAssetsList();
-        }
-      }, 100);
+      setTimeout(() => BimViewer.updateZOffsetAssetsList(), 100);
     }
-    
     
     const assetDiv = document.getElementById(`asset_${assetId}`);
     if (assetDiv) assetDiv.remove();
@@ -956,23 +791,18 @@ const BimViewer = {
     }, 3000);
   },
 
-  // ⭐ NEW: Enable lighting for newly added tileset (for dynamic sun-based lighting)
   enableTilesetLighting(tileset) {
     if (!tileset) return;
     
     try {
-      // Enable image-based lighting (responds to sun position)
       if (tileset.imageBasedLighting) {
         tileset.imageBasedLighting.enabled = true;
         tileset.imageBasedLighting.luminanceAtZenith = 0.5;
       }
       
-      // Enable shadows if lighting system is enabled
       if (this.lighting?.enabled) {
         tileset.shadows = Cesium.ShadowMode.ENABLED;
       }
-      
-      console.log('💡 Lighting enabled for tileset');
     } catch (error) {
       console.warn('Could not enable lighting for tileset:', error.message);
     }
@@ -996,7 +826,6 @@ const BimViewer = {
     }
   },
 
-  // ✅ NEW: Helper function to fix globe visibility issues
   fixGlobeVisibility() {
     console.log('🔧 Fixing globe visibility...');
     const scene = this.viewer.scene;
@@ -1007,40 +836,18 @@ const BimViewer = {
     scene.sun.show = true;
     scene.moon.show = true;
     
-    // Ensure at least one imagery layer exists
     if (this.viewer.imageryLayers.length === 0) {
-      console.log('📷 No imagery layers found, adding fallback imagery...');
       try {
-        // Try OpenStreetMap as reliable fallback
         const osmProvider = new Cesium.OpenStreetMapImageryProvider({
           url: 'https://a.tile.openstreetmap.org/'
         });
         this.viewer.imageryLayers.addImageryProvider(osmProvider);
-        console.log('✅ OpenStreetMap imagery added successfully');
       } catch (error) {
         console.error('❌ Failed to add OSM imagery:', error.message);
-        try {
-          // Last resort: Try Cesium's default
-          const defaultImagery = Cesium.createWorldImagery();
-          this.viewer.imageryLayers.addImageryProvider(defaultImagery);
-          console.log('✅ Default Cesium imagery added successfully');
-        } catch (fallbackError) {
-          console.error('❌ Failed to add any imagery:', fallbackError.message);
-        }
       }
-    } else {
-      console.log(`✅ Imagery layers already present: ${this.viewer.imageryLayers.length}`);
     }
     
-    // Force a render update
     scene.requestRender();
-    
-    console.log('✅ Globe visibility fix completed!');
-    console.log(`   - Globe: ${scene.globe.show}`);
-    console.log(`   - SkyBox: ${scene.skyBox.show}`);
-    console.log(`   - Atmosphere: ${scene.skyAtmosphere.show}`);
-    console.log(`   - Imagery Layers: ${this.viewer.imageryLayers.length}`);
-    
     this.updateStatus('Globe visibility restored', 'success');
   }
 };
@@ -1050,50 +857,26 @@ window.BimViewer = BimViewer;
 window.CONFIG = CONFIG;
 window.IFC_ENTITIES = IFC_ENTITIES;
 
-console.log('✅ BimViewer object created and exposed globally');
+console.log('✅ BimViewer object created (v3.3.2 - Dynamic Ion Token)');
 
-// ✅ Global Error Handler for Property/Semantic errors
+// Global Error Handler
 window.addEventListener('error', function(event) {
   if (event.error && event.error.message && event.error.message.includes('propertiesBySemantic')) {
-    console.warn('⚠️ GLOBAL: Property/Semantic error caught globally');
-    console.warn('   Error:', event.error.message);
-    console.warn('   This asset may have invalid property definitions but will remain visible');
-    
-    // Prevent the error from stopping everything
+    console.warn('⚠️ Property/Semantic error caught globally');
     event.preventDefault();
     event.stopPropagation();
     
-    // Try to restart rendering if viewer exists
     if (window.BimViewer && window.BimViewer.viewer) {
       try {
         window.BimViewer.viewer.scene.requestRender();
-        console.log('🔄 Rendering restarted after property error');
       } catch (restartError) {
         console.error('Failed to restart rendering:', restartError);
       }
     }
-    
-    return false; // Prevent default error handling
+    return false;
   }
-}, true); // Use capture phase
+}, true);
 
-console.log('✅ Global property error handler installed');
-
-// Initialize
-let initStarted = false;
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (!initStarted) {
-      initStarted = true;
-      BimViewer.init();
-    }
-  });
-} else {
-  if (!initStarted) {
-    initStarted = true;
-    BimViewer.init();
-  }
-}
-
-console.log('✅ Core module v3.3.1 loaded - Globe Fix for Cesium 1.134');
+// ✅ CHANGED: Don't auto-init - wait for auth and token
+// BimViewer.init() will be called from index.html after login + token entry
+console.log('✅ Core module v3.3.2 loaded - Waiting for auth and Ion Token...');

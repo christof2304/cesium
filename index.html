@@ -237,10 +237,24 @@
           return;
         }
         
+        // ✅ NEW: Check if Ion Token is available
+        const ionToken = BimAuth.getIonToken();
+        if (!ionToken) {
+          console.log('⏳ Waiting for Cesium Ion Token...');
+          return;
+        }
+        
+        // ✅ NEW: Apply Ion Token to Cesium
+        if (typeof Cesium !== 'undefined' && Cesium.Ion) {
+          Cesium.Ion.defaultAccessToken = ionToken;
+          console.log('✅ Cesium Ion Token applied');
+        }
+        
         console.log('✅ User authenticated, initializing BIM Viewer...');
         console.log('');
         console.log('📋 MODULE LOAD ORDER:');
         console.log('   0. 🔐 Auth (Login protection)');
+        console.log('   0.5 🛰️ Ion Token (User specific)');
         console.log('   1. Core, Features, Comments, etc.');
         console.log('   2. Clipping, Z-Offset');
         console.log('   3. 🔥 Lighting v4.0 (NEW - Fixed & Working)');
@@ -300,6 +314,7 @@
             console.log('🎉 All systems ready!');
             console.log('');
             console.log('🔐 LOGGED IN AS:', BimAuth.getCurrentUser()?.email);
+            console.log('🛰️ ION TOKEN:', ionToken.substring(0, 20) + '...');
             
           } else {
             // Update status to show waiting for asset

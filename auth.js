@@ -1,17 +1,15 @@
 // ===============================
-// CESIUM BIM VIEWER - FIREBASE AUTH MODULE v1.1
-// Simple Email/Password Login Protection
-// FIXED: Now initializes Comments module after login
+// CESIUM BIM VIEWER - FIREBASE AUTH MODULE v1.2
+// With Cesium Ion Token Support
 // ===============================
 'use strict';
 
 (function() {
   
-  console.log('🔐 Loading Firebase Auth module v1.1...');
+  console.log('🔐 Loading Firebase Auth module v1.2 (with Ion Token)...');
 
   // =====================================
   // FIREBASE AUTH CONFIG
-  // Uses the same project as comments!
   // =====================================
   
   const FIREBASE_AUTH_CONFIG = {
@@ -24,6 +22,111 @@
   };
 
   // =====================================
+  // CREATE TOKEN DIALOG HTML
+  // =====================================
+  
+  function createTokenDialog() {
+    // Check if dialog already exists
+    if (document.getElementById('tokenDialog')) return;
+    
+    const dialogHTML = `
+      <div id="tokenDialog" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 10000;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      ">
+        <div style="
+          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+          padding: 40px;
+          border-radius: 16px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          max-width: 500px;
+          width: 90%;
+          text-align: center;
+        ">
+          <div style="font-size: 48px; margin-bottom: 20px;">🛰️</div>
+          <h2 style="color: #5ac; margin: 0 0 10px 0; font-size: 24px;">Cesium Ion Token</h2>
+          <p style="color: rgba(255,255,255,0.7); margin: 0 0 25px 0; font-size: 14px; line-height: 1.6;">
+            Bitte gib deinen Cesium Ion Access Token ein.<br>
+            Du findest ihn unter <a href="https://ion.cesium.com/tokens" target="_blank" style="color: #5ac;">ion.cesium.com/tokens</a>
+          </p>
+          
+          <div id="tokenError" style="
+            display: none;
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid #e74c3c;
+            color: #e74c3c;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+          "></div>
+          
+          <input type="text" id="ionTokenInput" placeholder="Dein Cesium Ion Access Token" style="
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(90, 170, 204, 0.3);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 14px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+            outline: none;
+            transition: border-color 0.3s;
+          " onfocus="this.style.borderColor='#5ac'" onblur="this.style.borderColor='rgba(90, 170, 204, 0.3)'">
+          
+          <div style="display: flex; gap: 10px;">
+            <button id="tokenSubmitBtn" style="
+              flex: 1;
+              padding: 15px 30px;
+              background: linear-gradient(135deg, #5ac 0%, #4a9 100%);
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: transform 0.2s, box-shadow 0.2s;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 20px rgba(90,170,204,0.4)'" 
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              ✓ Token speichern
+            </button>
+          </div>
+          
+          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <label style="display: flex; align-items: center; justify-content: center; gap: 10px; color: rgba(255,255,255,0.6); font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="rememberToken" checked style="width: 18px; height: 18px; cursor: pointer;">
+              Token für zukünftige Besuche speichern
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', dialogHTML);
+    
+    // Event Listeners
+    document.getElementById('tokenSubmitBtn').addEventListener('click', () => {
+      BimAuth.submitToken();
+    });
+    
+    document.getElementById('ionTokenInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        BimAuth.submitToken();
+      }
+    });
+  }
+
+  // =====================================
   // AUTH STATE
   // =====================================
   
@@ -31,6 +134,7 @@
     currentUser: null,
     initialized: false,
     app: null,
+    ionToken: null,
     
     // Initialize Firebase Auth
     init: function() {
@@ -45,8 +149,10 @@
         return;
       }
       
+      // Create token dialog
+      createTokenDialog();
+      
       try {
-        // Check if Firebase is already initialized (from comments.js)
         if (firebase.apps.length === 0) {
           this.app = firebase.initializeApp(FIREBASE_AUTH_CONFIG);
         } else {
@@ -56,15 +162,13 @@
         this.initialized = true;
         console.log('✅ Firebase Auth initialized');
         
-        // Listen for auth state changes
         firebase.auth().onAuthStateChanged((user) => {
           this.currentUser = user;
           
           if (user) {
             console.log('✅ User logged in:', user.email);
             this.hideLoginScreen();
-            this.showApp();
-            this.updateUserBadge(user);
+            this.checkIonToken();
           } else {
             console.log('❌ No user logged in');
             this.showLoginScreen();
@@ -76,6 +180,111 @@
         console.error('❌ Firebase Auth init error:', error);
         this.showError('Firebase initialization failed: ' + error.message);
       }
+    },
+    
+    // Check for Ion Token
+    checkIonToken: function() {
+      const savedToken = localStorage.getItem('cesiumIonToken');
+      
+      if (savedToken) {
+        console.log('✅ Ion Token found in localStorage');
+        this.ionToken = savedToken;
+        this.applyToken(savedToken);
+        this.showApp();
+        this.updateUserBadge(this.currentUser);
+      } else {
+        console.log('❓ No Ion Token found, showing dialog...');
+        this.showTokenDialog();
+      }
+    },
+    
+    // Show Token Dialog
+    showTokenDialog: function() {
+      const dialog = document.getElementById('tokenDialog');
+      if (dialog) {
+        dialog.style.display = 'flex';
+        document.getElementById('ionTokenInput').focus();
+      }
+    },
+    
+    // Hide Token Dialog
+    hideTokenDialog: function() {
+      const dialog = document.getElementById('tokenDialog');
+      if (dialog) {
+        dialog.style.display = 'none';
+      }
+    },
+    
+    // Submit Token
+    submitToken: function() {
+      const tokenInput = document.getElementById('ionTokenInput');
+      const rememberCheckbox = document.getElementById('rememberToken');
+      const token = tokenInput.value.trim();
+      
+      if (!token) {
+        this.showTokenError('Bitte gib einen Token ein');
+        return;
+      }
+      
+      if (token.length < 10) {
+        this.showTokenError('Token scheint ungültig zu sein');
+        return;
+      }
+      
+      // Save token
+      this.ionToken = token;
+      
+      if (rememberCheckbox.checked) {
+        localStorage.setItem('cesiumIonToken', token);
+        console.log('✅ Ion Token saved to localStorage');
+      }
+      
+      // Apply token and continue
+      this.applyToken(token);
+      this.hideTokenDialog();
+      this.showApp();
+      this.updateUserBadge(this.currentUser);
+      
+      console.log('✅ Ion Token applied successfully');
+    },
+    
+    // Apply Token to Cesium
+    applyToken: function(token) {
+      if (typeof Cesium !== 'undefined') {
+        Cesium.Ion.defaultAccessToken = token;
+        console.log('✅ Cesium Ion token set');
+      } else {
+        // Cesium not loaded yet, set it globally
+        window.CESIUM_ION_TOKEN = token;
+        console.log('✅ Cesium Ion token stored for later use');
+      }
+    },
+    
+    // Show Token Error
+    showTokenError: function(message) {
+      const errorEl = document.getElementById('tokenError');
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+      }
+    },
+    
+    // Get Ion Token
+    getIonToken: function() {
+      return this.ionToken || localStorage.getItem('cesiumIonToken');
+    },
+    
+    // Clear Ion Token
+    clearIonToken: function() {
+      this.ionToken = null;
+      localStorage.removeItem('cesiumIonToken');
+      console.log('✅ Ion Token cleared');
+    },
+    
+    // Change Ion Token (for settings)
+    changeIonToken: function() {
+      this.clearIonToken();
+      this.showTokenDialog();
     },
     
     // Login with email/password
@@ -160,15 +369,12 @@
       if (cesiumContainer) cesiumContainer.style.display = 'block';
       if (toolbar) toolbar.style.display = 'block';
       
-      // ✅ NEU v1.1: Comments-Modul initialisieren nach erfolgreichem Login
-      // Warte kurz, damit BimViewer vollständig geladen ist
+      // Initialize Comments module after login
       setTimeout(() => {
         if (typeof BimViewer !== 'undefined' && typeof BimViewer.initFirebase === 'function') {
           console.log('🔐 Initializing Comments module after login...');
           BimViewer.initFirebase();
         } else {
-          console.warn('⚠️ BimViewer.initFirebase not available yet, retrying...');
-          // Retry nach weiteren 500ms
           setTimeout(() => {
             if (typeof BimViewer !== 'undefined' && typeof BimViewer.initFirebase === 'function') {
               BimViewer.initFirebase();
@@ -176,11 +382,6 @@
           }, 500);
         }
       }, 100);
-      
-      // Show all other UI elements
-      document.querySelectorAll('.mode-indicator, .status-indicator, #commentDialog, #infoBoxCustom').forEach(el => {
-        // Don't change display, just allow them to be shown when needed
-      });
     },
     
     hideApp: function() {
@@ -190,7 +391,6 @@
       if (cesiumContainer) cesiumContainer.style.display = 'none';
       if (toolbar) toolbar.style.display = 'none';
       
-      // Hide all overlays
       document.querySelectorAll('.mode-indicator, .status-indicator, #commentDialog, #infoBoxCustom').forEach(el => {
         if (el.classList.contains('active')) {
           el.classList.remove('active');
@@ -237,17 +437,14 @@
       }
     },
     
-    // Get current user
     getCurrentUser: function() {
       return this.currentUser;
     },
     
-    // Check if logged in
     isLoggedIn: function() {
       return this.currentUser !== null;
     },
     
-    // ✅ NEU v1.1: Passwort zurücksetzen
     resetPassword: async function(email) {
       if (!email) {
         this.showError('Bitte E-Mail-Adresse eingeben');
@@ -300,18 +497,17 @@
       });
     }
     
-    // Initialize auth after a short delay to ensure Firebase SDK is ready
     setTimeout(() => {
       BimAuth.init();
     }, 100);
   });
 
-  console.log('✅ Firebase Auth module loaded (v1.1)');
+  console.log('✅ Firebase Auth module loaded (v1.2 with Ion Token)');
   console.log('💡 Usage:');
   console.log('   - BimAuth.login(email, password)');
   console.log('   - BimAuth.logout()');
-  console.log('   - BimAuth.getCurrentUser()');
-  console.log('   - BimAuth.isLoggedIn()');
-  console.log('   - BimAuth.resetPassword(email)');
+  console.log('   - BimAuth.getIonToken()');
+  console.log('   - BimAuth.changeIonToken()');
+  console.log('   - BimAuth.clearIonToken()');
 
 })();
