@@ -1,12 +1,13 @@
 // ===============================
-// CESIUM BIM VIEWER - FEATURES MODULE (FIXED IFC FILTER v2.5)
+// CESIUM BIM VIEWER - FEATURES MODULE (FIXED IFC FILTER v2.6)
 // Drawing, Clipping, Saved Views, IFC Filtering with className Support
+// v2.6: Removed auto-init - now called from index.html after viewer ready
 // ===============================
 'use strict';
 
 (function() {
   
-  console.log('🔧 Loading Features Module with Fixed IFC Filter v2.5...');
+  console.log('🔧 Loading Features Module v2.6 (No Auto-Init)...');
   
   // Drawing & Clipping Functions
   BimViewer.enterDrawingMode = function() {
@@ -849,9 +850,8 @@
   // ===============================
   BimViewer.initFeatures = function() {
     if (!this.viewer || !this.viewer.scene) {
-      console.log('⏳ Waiting for viewer to be ready...');
-      setTimeout(() => this.initFeatures(), 100);
-      return;
+      console.warn('⚠️ initFeatures called but viewer not ready yet');
+      return false;
     }
     
     console.log('🚀 Initializing features...');
@@ -859,19 +859,12 @@
     this.updateSavedViewsList();
     console.log('✅ Features initialized');
     console.log('💡 TIP: Use BimViewer.testIFCFilter() in console to test IFC filtering');
+    return true;
   };
   
-  // Initialize on DOM ready, but wait for viewer
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('📋 DOM ready, waiting for viewer...');
-      BimViewer.initFeatures();
-    });
-  } else {
-    console.log('📋 DOM already ready, waiting for viewer...');
-    BimViewer.initFeatures();
-  }
+  // ✅ CHANGED v2.6: Don't auto-init - will be called from index.html after viewer is ready
+  console.log('📋 Features module ready - waiting for BimViewer.initFeatures() call');
 
 })();
 
-console.log('✅ Features module loaded - v2.5 (Fixed IFC Filter with className Support)');
+console.log('✅ Features module loaded - v2.6 (No Auto-Init)');

@@ -226,6 +226,9 @@
        INITIALIZATION SCRIPT
        ============================================ -->
   <script>
+    // ✅ Flag to track if viewer has been initialized
+    let viewerInitialized = false;
+    
     window.addEventListener('load', function() {
       console.log('🚀 Page loaded, waiting for authentication...');
       
@@ -237,95 +240,132 @@
           return;
         }
         
-        // ✅ NEW: Check if Ion Token is available
+        // ✅ Check if Ion Token is available
         const ionToken = BimAuth.getIonToken();
         if (!ionToken) {
           console.log('⏳ Waiting for Cesium Ion Token...');
           return;
         }
         
-        // ✅ NEW: Apply Ion Token to Cesium
+        // ✅ Check if viewer already initialized
+        if (viewerInitialized) {
+          return;
+        }
+        
+        console.log('✅ User authenticated and Ion Token available');
+        console.log('🚀 Initializing BIM Viewer...');
+        
+        // ✅ Apply Ion Token to Cesium BEFORE init
         if (typeof Cesium !== 'undefined' && Cesium.Ion) {
           Cesium.Ion.defaultAccessToken = ionToken;
           console.log('✅ Cesium Ion Token applied');
         }
         
-        console.log('✅ User authenticated, initializing BIM Viewer...');
-        console.log('');
-        console.log('📋 MODULE LOAD ORDER:');
-        console.log('   0. 🔐 Auth (Login protection)');
-        console.log('   0.5 🛰️ Ion Token (User specific)');
-        console.log('   1. Core, Features, Comments, etc.');
-        console.log('   2. Clipping, Z-Offset');
-        console.log('   3. 🔥 Lighting v4.0 (NEW - Fixed & Working)');
-        console.log('   4. 🔥 Standalone Lighting UI (NEW)');
-        console.log('   5. UI.js');
-        console.log('   6. UI Extensions');
-        console.log('   7. UI Helpers');
-        console.log('');
-        
-        // Wait for BimViewer and an asset to be loaded
-        if (typeof BimViewer !== 'undefined' && BimViewer.viewer) {
+        // ✅ Initialize BimViewer
+        if (typeof BimViewer !== 'undefined' && typeof BimViewer.init === 'function') {
+          viewerInitialized = true;
           
-          // ⭐ EARLY INIT: Initialize lighting system IMMEDIATELY
-          if (typeof BimViewer.initLighting === 'function' && !BimViewer.lighting) {
-            BimViewer.initLighting();
-            console.log('✅ Lighting system initialized (early)');
-          } else if (!BimViewer.initLighting) {
-            console.warn('⚠️ BimViewer.initLighting not found - lighting-v4.js may not be loaded!');
-          }
+          BimViewer.init().then(() => {
+            console.log('✅ BimViewer.init() completed');
+            
+            // ✅ Now initialize features (after viewer is ready)
+            if (typeof BimViewer.initFeatures === 'function') {
+              BimViewer.initFeatures();
+              console.log('✅ Features initialized');
+            }
+            
+            // ✅ Initialize lighting system
+            if (typeof BimViewer.initLighting === 'function' && !BimViewer.lighting) {
+              BimViewer.initLighting();
+              console.log('✅ Lighting system initialized');
+            }
+            
+            // ✅ Wait for first asset before initializing other systems
+            waitForAssetAndInitSystems();
+            
+          }).catch(error => {
+            console.error('❌ BimViewer.init() failed:', error);
+            viewerInitialized = false;
+          });
           
-          // Check if at least one asset is loaded
-          if (BimViewer.loadedAssets && BimViewer.loadedAssets.size > 0) {
-            clearInterval(initSystems);
-            console.log('✅ Asset detected, initializing all systems...');
-            
-            // Initialize Firebase (comments - auth is separate)
-            if (BimViewer.initFirebase && BimViewer.initFirebase()) {
-              console.log('✅ Firebase Firestore initialized for comments');
-              const statusEl = document.getElementById('commentsListStatus');
-              if (statusEl) statusEl.textContent = 'Ready';
-            } else {
-              console.log('⚠️ Firebase Firestore initialization failed - showing manual init button');
-              const initBtn = document.getElementById('initFirebaseBtn');
-              if (initBtn) initBtn.style.display = 'block';
-              const statusEl = document.getElementById('commentsListStatus');
-              if (statusEl) statusEl.textContent = 'Not initialized';
-            }
-            
-            // Initialize comment click handler
-            if (typeof BimViewer.initCommentClickHandler === 'function') {
-              BimViewer.initCommentClickHandler();
-              console.log('✅ Comment click handler initialized');
-            }
-            
-            // Initialize hide features
-            if (typeof BimViewer.initHideFeatures === 'function') {
-              BimViewer.initHideFeatures();
-              console.log('✅ Hide features initialized');
-            }
-            
-            // Initialize point cloud settings
-            if (typeof BimViewer.initPointCloudSettings === 'function') {
-              BimViewer.initPointCloudSettings();
-              console.log('✅ Point cloud settings initialized');
-            }
-            
-            console.log('🎉 All systems ready!');
-            console.log('');
-            console.log('🔐 LOGGED IN AS:', BimAuth.getCurrentUser()?.email);
-            console.log('🛰️ ION TOKEN:', ionToken.substring(0, 20) + '...');
-            
-          } else {
-            // Update status to show waiting for asset
-            const statusEl = document.getElementById('commentsListStatus');
-            if (statusEl) {
-              statusEl.textContent = 'Waiting for asset...';
-            }
-          }
+          // Stop the interval - init started
+          clearInterval(initSystems);
         }
+        
       }, 500);
     });
+    
+    // ✅ Wait for asset to load before initializing Firebase/Comments
+    function waitForAssetAndInitSystems() {
+      console.log('⏳ Waiting for first asset to load...');
+      
+      const assetCheck = setInterval(function() {
+        if (!BimViewer.viewer) {
+          return;
+        }
+        
+        // Check if at least one asset is loaded
+        if (BimViewer.loadedAssets && BimViewer.loadedAssets.size > 0) {
+          clearInterval(assetCheck);
+          console.log('✅ Asset detected, initializing remaining systems...');
+          
+          initializeRemainingSystems();
+        }
+      }, 500);
+      
+      // Also allow manual initialization after 5 seconds even without asset
+      setTimeout(() => {
+        if (BimViewer.viewer && !BimViewer.loadedAssets?.size) {
+          console.log('⏳ No asset loaded yet, but initializing systems anyway...');
+          initializeRemainingSystems();
+        }
+      }, 5000);
+    }
+    
+    // ✅ Initialize Firebase, Comments, Hide Features, etc.
+    function initializeRemainingSystems() {
+      console.log('');
+      console.log('📋 INITIALIZING REMAINING SYSTEMS:');
+      
+      // Initialize Firebase (comments)
+      if (typeof BimViewer.initFirebase === 'function') {
+        if (BimViewer.initFirebase()) {
+          console.log('✅ Firebase Firestore initialized for comments');
+          const statusEl = document.getElementById('commentsListStatus');
+          if (statusEl) statusEl.textContent = 'Ready';
+        } else {
+          console.log('⚠️ Firebase Firestore initialization failed');
+          const initBtn = document.getElementById('initFirebaseBtn');
+          if (initBtn) initBtn.style.display = 'block';
+          const statusEl = document.getElementById('commentsListStatus');
+          if (statusEl) statusEl.textContent = 'Not initialized';
+        }
+      }
+      
+      // Initialize comment click handler (if not already done in features)
+      if (typeof BimViewer.initCommentClickHandler === 'function' && !BimViewer.comments?.clickHandlerInitialized) {
+        BimViewer.initCommentClickHandler();
+        console.log('✅ Comment click handler initialized');
+      }
+      
+      // Initialize hide features
+      if (typeof BimViewer.initHideFeatures === 'function') {
+        BimViewer.initHideFeatures();
+        console.log('✅ Hide features initialized');
+      }
+      
+      // Initialize point cloud settings
+      if (typeof BimViewer.initPointCloudSettings === 'function') {
+        BimViewer.initPointCloudSettings();
+        console.log('✅ Point cloud settings initialized');
+      }
+      
+      console.log('');
+      console.log('🎉 All systems ready!');
+      console.log('🔐 LOGGED IN AS:', BimAuth.getCurrentUser()?.email);
+      console.log('🛰️ ION TOKEN:', BimAuth.getIonToken()?.substring(0, 20) + '...');
+      console.log('');
+    }
   </script>
 </body>
 </html>
