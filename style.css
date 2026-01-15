@@ -1103,3 +1103,110 @@ body {
   color: #a5b4fc;
   font-weight: 600;
 }
+
+/* ===============================
+   ION SDK MEASUREMENT WIDGET FIX
+   =============================== */
+#ionSdkMeasurementWidget {
+  min-width: 280px !important;
+  max-width: 320px !important;
+  background: rgba(26, 32, 44, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  overflow: hidden !important;
+}
+
+/* Ion SDK Widget inner container */
+#ionSdkMeasurementWidget .cesium-measure-toolbar,
+#ionSdkMeasurementWidget .measure-toolbar,
+#ionSdkMeasurementWidget > div {
+  min-width: 260px !important;
+  width: 100% !important;
+}
+
+/* Fix für gestauchte Buttons */
+#ionSdkMeasurementWidget button,
+#ionSdkMeasurementWidget .measure-button,
+#ionSdkMeasurementWidget .cesium-button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  padding: 10px !important;
+  margin: 4px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+/* Button-Reihen nicht gestaucht */
+#ionSdkMeasurementWidget .cesium-measure-toolbar-buttons,
+#ionSdkMeasurementWidget .measure-buttons,
+#ionSdkMeasurementWidget .toolbar-buttons {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  padding: 12px !important;
+  justify-content: center !important;
+}
+
+/* Labels und Text im Widget */
+#ionSdkMeasurementWidget label,
+#ionSdkMeasurementWidget span,
+#ionSdkMeasurementWidget .measure-label {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* Ergebnis-Anzeige */
+#ionSdkMeasurementWidget .cesium-measure-result,
+#ionSdkMeasurementWidget .measure-result,
+#ionSdkMeasurementWidget .result-display {
+  min-width: 200px !important;
+  padding: 12px !important;
+  font-size: 14px !important;
+  text-align: center !important;
+}
+
+/* SVG Icons nicht gestaucht */
+#ionSdkMeasurementWidget svg {
+  min-width: 24px !important;
+  min-height: 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Fallback UI Styling */
+#ionSdkMeasurementWidget .btn {
+  width: 100% !important;
+  padding: 12px 16px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#ionSdkMeasurementWidget .btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+}
+
+#ionSdkMeasurementWidget .btn-primary:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
+}
+
+#ionSdkMeasurementWidget .btn-danger {
+  background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%) !important;
+  color: white !important;
+}
+
+#ionSdkMeasurementWidget .btn-danger:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(238, 9, 121, 0.4) !important;
+}
