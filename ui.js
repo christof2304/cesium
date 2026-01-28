@@ -51,6 +51,13 @@ const BimViewerUI = {
   createHeader() {
     const header = document.createElement('div');
     header.className = 'modern-header';
+
+    // Get current account name
+    let accountName = 'Not connected';
+    if (typeof BimAuth !== 'undefined' && BimAuth.getCurrentAccountName) {
+      accountName = BimAuth.getCurrentAccountName();
+    }
+
     header.innerHTML = `
       <div class="modern-header-content">
         <div class="modern-logo">
@@ -59,6 +66,10 @@ const BimViewerUI = {
             <div class="modern-logo-title">CESIUM BIM</div>
             <div class="modern-logo-subtitle">Ultra Viewer</div>
           </div>
+        </div>
+        <div class="modern-account-badge" id="ionAccountBadge" title="Current ION Account">
+          <span class="modern-account-icon">🛰️</span>
+          <span class="modern-account-name" id="ionAccountName">${accountName}</span>
         </div>
       </div>
     `;
@@ -535,6 +546,22 @@ const BimViewerUI = {
           <span>Underground Mode</span>
         </button>
       </div>
+
+      <div class="modern-group">
+        <div class="modern-label">Cesium ION Account</div>
+        <select id="ionAccountSelector" class="modern-select">
+          <option value="default">Default</option>
+          <option value="publictwin">PublicTwin</option>
+          <option value="christoflorenz">christoflorenz.de</option>
+        </select>
+        <button id="switchIonToken" class="modern-btn modern-btn-secondary" style="margin-top: 8px;">
+          <span class="modern-btn-icon">🔑</span>
+          <span>Enter Custom Token</span>
+        </button>
+        <div class="modern-hint">
+          Select a saved account or enter a custom token
+        </div>
+      </div>
     `;
   },
 
@@ -766,6 +793,42 @@ const BimViewerUI = {
       document.getElementById('globeAlphaValue').textContent = Math.round(alpha * 100) + '%';
     });
 
+    // ION Account Selector
+    document.getElementById('ionAccountSelector')?.addEventListener('change', (e) => {
+      const accountId = e.target.value;
+      if (typeof BimAuth !== 'undefined' && BimAuth.switchAccount) {
+        BimAuth.switchAccount(accountId);
+        // Update header badge
+        BimViewerUI.updateAccountBadge();
+      } else {
+        console.error('BimAuth not available');
+        BimViewer.updateStatus('Auth module not loaded', 'error');
+      }
+    });
+
+    // Set initial dropdown value and badge based on current account
+    setTimeout(() => {
+      const selector = document.getElementById('ionAccountSelector');
+      if (selector && typeof BimAuth !== 'undefined') {
+        const currentAccount = BimAuth.getCurrentAccountId();
+        if (currentAccount) {
+          selector.value = currentAccount;
+        }
+      }
+      // Update badge on init
+      BimViewerUI.updateAccountBadge();
+    }, 500);
+
+    // ION Token Switch (custom token)
+    document.getElementById('switchIonToken')?.addEventListener('click', () => {
+      if (typeof BimAuth !== 'undefined' && BimAuth.changeIonToken) {
+        BimAuth.changeIonToken();
+      } else {
+        console.error('BimAuth not available');
+        BimViewer.updateStatus('Auth module not loaded', 'error');
+      }
+    });
+
     // ⭐ NEW: Lighting Controls
     document.getElementById('toggleDynamicLighting')?.addEventListener('click', function() {
       const isEnabled = BimViewer.lighting?.enabled || false;
@@ -831,6 +894,14 @@ const BimViewerUI = {
         BimViewer.viewer.clock.multiplier = speed;
       }
     });
+  },
+
+  // Update account badge in header
+  updateAccountBadge() {
+    const badge = document.getElementById('ionAccountName');
+    if (badge && typeof BimAuth !== 'undefined' && BimAuth.getCurrentAccountName) {
+      badge.textContent = BimAuth.getCurrentAccountName();
+    }
   },
 
   // ⭐ NEW: Create asset control WITH INTEGRATED Z-OFFSET

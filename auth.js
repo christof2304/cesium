@@ -130,11 +130,31 @@
   // AUTH STATE
   // =====================================
   
+  // =====================================
+  // SAVED ION ACCOUNTS
+  // =====================================
+
+  const SAVED_ION_ACCOUNTS = {
+    'default': {
+      name: 'Default',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2NTY4OWFmYy05NzI4LTQ4ZWEtODc5Yi0zYWQ2Njg5ZDFiMTgiLCJpZCI6MjYzNTkwLCJpYXQiOjE3NTIyNTM2MzZ9.ie5CjK4mgkYmOOdiJp-Zwdy_biqwWXFAVOeD3Fx6_Ro'
+    },
+    'publictwin': {
+      name: 'PublicTwin',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmNWFjNDYxZC0yN2U5LTQ0MGYtYWY1Ny1lN2VmNGJiNjVlYTQiLCJpZCI6MjYzNTkwLCJpYXQiOjE3NjE3MzIzOTh9.HsP4Aq5jS6OiRwUXc8uRv6nwbrTcx8ugaGSkLiTYhO8'
+    },
+    'christoflorenz': {
+      name: 'christoflorenz.de',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlMDkwZDM4OC00NzRhLTQyMmYtOTI2ZS02NGZiM2Q2MTE2OGMiLCJpZCI6MjYzNTkwLCJpYXQiOjE3NDExNzk0MTB9.jnf8NDf2PoydWpK3mwDkbp8IYIif5T_-Ioy3Bx6n3Cc'
+    }
+  };
+
   window.BimAuth = {
     currentUser: null,
     initialized: false,
     app: null,
     ionToken: null,
+    currentAccountId: null,
     
     // Initialize Firebase Auth
     init: function() {
@@ -277,7 +297,9 @@
     // Clear Ion Token
     clearIonToken: function() {
       this.ionToken = null;
+      this.currentAccountId = null;
       localStorage.removeItem('cesiumIonToken');
+      localStorage.removeItem('cesiumIonAccountId');
       console.log('✅ Ion Token cleared');
     },
     
@@ -285,6 +307,55 @@
     changeIonToken: function() {
       this.clearIonToken();
       this.showTokenDialog();
+    },
+
+    // Get saved accounts list
+    getSavedAccounts: function() {
+      return SAVED_ION_ACCOUNTS;
+    },
+
+    // Get current account ID
+    getCurrentAccountId: function() {
+      return this.currentAccountId || localStorage.getItem('cesiumIonAccountId') || null;
+    },
+
+    // Switch to a saved account
+    switchAccount: function(accountId) {
+      const account = SAVED_ION_ACCOUNTS[accountId];
+
+      if (!account) {
+        console.error('❌ Account not found:', accountId);
+        return false;
+      }
+
+      // Update state
+      this.ionToken = account.token;
+      this.currentAccountId = accountId;
+
+      // Save to localStorage
+      localStorage.setItem('cesiumIonToken', account.token);
+      localStorage.setItem('cesiumIonAccountId', accountId);
+
+      // Apply to Cesium
+      this.applyToken(account.token);
+
+      console.log(`✅ Switched to ION account: ${account.name}`);
+
+      // Show status if BimViewer is available
+      if (typeof BimViewer !== 'undefined' && BimViewer.updateStatus) {
+        BimViewer.updateStatus(`Switched to ${account.name}`, 'success');
+      }
+
+      return true;
+    },
+
+    // Get current account name for display
+    getCurrentAccountName: function() {
+      const accountId = this.getCurrentAccountId();
+      if (accountId && SAVED_ION_ACCOUNTS[accountId]) {
+        return SAVED_ION_ACCOUNTS[accountId].name;
+      }
+      return 'Custom Token';
     },
     
     // Login with email/password
