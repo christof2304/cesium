@@ -792,7 +792,7 @@ const BimViewerUI = {
     assetDiv.innerHTML = `
       <!-- Asset Header -->
       <div class="modern-asset-header">
-        <div class="modern-asset-name">${assetData.name}</div>
+        <div class="modern-asset-name" title="${assetData.name}">${assetData.name}</div>
         <div class="modern-asset-controls">
           <button class="modern-icon-btn" onclick="BimViewer.zoomToAsset('${assetId}')" title="Zoom to">📍</button>
           <button class="modern-icon-btn" onclick="BimViewer.toggleAssetVisibility('${assetId}')" title="Toggle visibility">👁️</button>
