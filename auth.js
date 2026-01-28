@@ -259,12 +259,26 @@
         console.log('✅ Ion Token saved to localStorage');
       }
       
+      // Mark as custom token
+      this.currentAccountId = 'custom';
+      localStorage.setItem('cesiumIonAccountId', 'custom');
+
       // Apply token and continue
       this.applyToken(token);
       this.hideTokenDialog();
       this.showApp();
       this.updateUserBadge(this.currentUser);
-      
+
+      // Update UI if available
+      if (typeof BimViewerUI !== 'undefined' && BimViewerUI.updateAccountBadge) {
+        BimViewerUI.updateAccountBadge();
+        // Also update dropdown
+        const selector = document.getElementById('ionAccountSelector');
+        if (selector) {
+          selector.value = 'custom';
+        }
+      }
+
       console.log('✅ Ion Token applied successfully');
     },
     

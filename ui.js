@@ -36,8 +36,8 @@ const BimViewerUI = {
     toolbar.appendChild(this.createHeader());
     
     // Collapsible sections
+    // NOTE: Lighting section is provided by ui-lighting-standalone.js
     toolbar.appendChild(this.createSection('assets', '📦', 'Assets', this.getAssetsContent()));
-    toolbar.appendChild(this.createSection('lighting', '☀️', 'Lighting & Time', this.getLightingContent()));
     toolbar.appendChild(this.createSection('pointcloud', '☁️', 'Point Cloud Settings', this.getPointCloudContent()));
     toolbar.appendChild(this.createSection('drawing', '✏️', 'Drawing & Clipping', this.getDrawingContent()));
     toolbar.appendChild(this.createSection('comments', '💬', 'Comments', this.getCommentsContent()));
@@ -553,6 +553,7 @@ const BimViewerUI = {
           <option value="default">Default</option>
           <option value="publictwin">PublicTwin</option>
           <option value="christoflorenz">christoflorenz.de</option>
+          <option value="custom">Custom Token</option>
         </select>
         <button id="switchIonToken" class="modern-btn modern-btn-secondary" style="margin-top: 8px;">
           <span class="modern-btn-icon">🔑</span>
@@ -796,10 +797,15 @@ const BimViewerUI = {
     // ION Account Selector
     document.getElementById('ionAccountSelector')?.addEventListener('change', (e) => {
       const accountId = e.target.value;
-      if (typeof BimAuth !== 'undefined' && BimAuth.switchAccount) {
-        BimAuth.switchAccount(accountId);
-        // Update header badge
-        BimViewerUI.updateAccountBadge();
+      if (typeof BimAuth !== 'undefined') {
+        if (accountId === 'custom') {
+          // Show token dialog for custom token
+          BimAuth.changeIonToken();
+        } else if (BimAuth.switchAccount) {
+          BimAuth.switchAccount(accountId);
+          // Update header badge
+          BimViewerUI.updateAccountBadge();
+        }
       } else {
         console.error('BimAuth not available');
         BimViewer.updateStatus('Auth module not loaded', 'error');
