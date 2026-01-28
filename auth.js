@@ -146,6 +146,10 @@
     'christoflorenz': {
       name: 'christoflorenz.de',
       token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlMDkwZDM4OC00NzRhLTQyMmYtOTI2ZS02NGZiM2Q2MTE2OGMiLCJpZCI6MjYzNTkwLCJpYXQiOjE3NDExNzk0MTB9.jnf8NDf2PoydWpK3mwDkbp8IYIif5T_-Ioy3Bx6n3Cc'
+    },
+    'christof2304': {
+      name: 'christof2304',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzYWZiMTMwZi0xOGU0LTRjMTYtYWU5Zi0yZTg3ODEwZDAxYjEiLCJpZCI6Mjk4NDk1LCJpYXQiOjE3NjgwMzg1NjB9.vx8K-IMvKAWIvBQ62Lhi9LflkeWuRu-aa9ZMsnh9xPw'
     }
   };
 

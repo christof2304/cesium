@@ -160,81 +160,6 @@ const BimViewerUI = {
     `;
   },
 
-  // Lighting & Time content
-  getLightingContent() {
-    return `
-      <div class="modern-group">
-        <div class="modern-label">☀️ Dynamic Lighting</div>
-        
-        <button id="toggleDynamicLighting" class="modern-btn modern-btn-primary">
-          <span class="modern-btn-icon">🌅</span>
-          <span>Enable Lighting</span>
-        </button>
-        
-        <div id="lightingControls" style="display: none; margin-top: 12px;">
-          <div class="modern-label-small">Night Brightness</div>
-          <select id="ambientLightMode" class="modern-select" style="margin-bottom: 12px;">
-            <option value="realistic" selected>🌙 Realistic (Dark at Night)</option>
-            <option value="soft">🌆 Soft (Slightly Visible)</option>
-            <option value="balanced">🌃 Balanced (Moderately Lit)</option>
-            <option value="bright">💡 Bright (Always Visible)</option>
-          </select>
-          
-          <div class="modern-hint" style="margin-bottom: 12px; font-size: 10px;">
-            <strong>🌙 Realistic:</strong> Assets are completely dark at night (like real life)<br>
-            <strong>🌆 Soft:</strong> Slight ambient glow at night (subtle)<br>
-            <strong>🌃 Balanced:</strong> Moderate visibility at night<br>
-            <strong>💡 Bright:</strong> Always bright (default Cesium)
-          </div>
-          
-          <div class="modern-label-small">Time of Day</div>
-          
-          <div class="modern-time-presets">
-            <button class="modern-time-btn" data-time="dawn" title="6:00 AM">🌄 Dawn</button>
-            <button class="modern-time-btn" data-time="morning" title="9:00 AM">🌞 Morning</button>
-            <button class="modern-time-btn" data-time="noon" title="12:00 PM">☀️ Noon</button>
-            <button class="modern-time-btn" data-time="afternoon" title="3:00 PM">🌤️ Afternoon</button>
-            <button class="modern-time-btn" data-time="sunset" title="6:00 PM">🌇 Sunset</button>
-            <button class="modern-time-btn" data-time="dusk" title="7:30 PM">🌆 Dusk</button>
-            <button class="modern-time-btn" data-time="night" title="11:00 PM">🌙 Night</button>
-            <button class="modern-time-btn" data-time="midnight" title="12:00 AM">🌃 Midnight</button>
-          </div>
-          
-          <div style="margin-top: 12px;">
-            <div class="modern-label-small">Time Animation</div>
-            <div class="modern-btn-group">
-              <button id="toggleTimeAnimation" class="modern-btn modern-btn-small">
-                <span class="modern-btn-icon">▶️</span>
-                <span>Play</span>
-              </button>
-              <button id="stopTimeAnimation" class="modern-btn modern-btn-small">
-                <span class="modern-btn-icon">⏸️</span>
-                <span>Pause</span>
-              </button>
-            </div>
-            
-            <div style="margin-top: 8px;">
-              <label class="modern-label-small">
-                Speed: <span id="timeSpeedValue">100x</span>
-              </label>
-              <input type="range" 
-                     id="timeSpeedSlider" 
-                     class="modern-slider"
-                     min="1" 
-                     max="1000" 
-                     value="100"
-                     style="width: 100%;">
-            </div>
-          </div>
-          
-          <div class="modern-hint" style="margin-top: 12px;">
-            <strong>💡 Tip:</strong> Set to "Realistic" and try "🌙 Night" preset to see assets become completely dark!
-          </div>
-        </div>
-      </div>
-    `;
-  },
-
   // Point Cloud Settings content
   getPointCloudContent() {
     return `
@@ -502,6 +427,21 @@ const BimViewerUI = {
   getSettingsContent() {
     return `
       <div class="modern-group">
+        <div class="modern-label">Cesium ION Account</div>
+        <select id="ionAccountSelector" class="modern-select">
+          <option value="default">Default</option>
+          <option value="publictwin">PublicTwin</option>
+          <option value="christoflorenz">christoflorenz.de</option>
+          <option value="christof2304">christof2304</option>
+          <option value="custom">Custom Token</option>
+        </select>
+        <button id="switchIonToken" class="modern-btn modern-btn-secondary" style="margin-top: 8px;">
+          <span class="modern-btn-icon">🔑</span>
+          <span>Enter Custom Token</span>
+        </button>
+      </div>
+
+      <div class="modern-group">
         <div class="modern-label">Performance Preset</div>
         <select id="performancePreset" class="modern-select">
           <option value="PERFORMANCE">⚡ Performance</option>
@@ -510,7 +450,7 @@ const BimViewerUI = {
           <option value="ULTRA">🌟 Ultra</option>
         </select>
       </div>
-      
+
       <div class="modern-group">
         <div class="modern-label">Base Layers</div>
         <button id="toggleOSMBuildings" class="modern-toggle-btn active">
@@ -522,14 +462,14 @@ const BimViewerUI = {
           <span>Google 3D Tiles</span>
         </button>
       </div>
-      
+
       <div class="modern-group">
         <div class="modern-label">Globe Transparency</div>
         <button id="toggleGlobeTransparency" class="modern-toggle-btn">
           <span class="modern-btn-icon">🌐</span>
           <span>Enable Transparency</span>
         </button>
-        
+
         <div id="globeTransparencyControls" style="display: none;">
           <div class="modern-slider-group">
             <label class="modern-label-small">Alpha</label>
@@ -538,30 +478,13 @@ const BimViewerUI = {
           </div>
         </div>
       </div>
-      
+
       <div class="modern-group">
         <div class="modern-label">Advanced</div>
         <button id="toggleUndergroundView" class="modern-toggle-btn">
           <span class="modern-btn-icon">🕳️</span>
           <span>Underground Mode</span>
         </button>
-      </div>
-
-      <div class="modern-group">
-        <div class="modern-label">Cesium ION Account</div>
-        <select id="ionAccountSelector" class="modern-select">
-          <option value="default">Default</option>
-          <option value="publictwin">PublicTwin</option>
-          <option value="christoflorenz">christoflorenz.de</option>
-          <option value="custom">Custom Token</option>
-        </select>
-        <button id="switchIonToken" class="modern-btn modern-btn-secondary" style="margin-top: 8px;">
-          <span class="modern-btn-icon">🔑</span>
-          <span>Enter Custom Token</span>
-        </button>
-        <div class="modern-hint">
-          Select a saved account or enter a custom token
-        </div>
       </div>
     `;
   },
@@ -835,71 +758,6 @@ const BimViewerUI = {
       }
     });
 
-    // ⭐ NEW: Lighting Controls
-    document.getElementById('toggleDynamicLighting')?.addEventListener('click', function() {
-      const isEnabled = BimViewer.lighting?.enabled || false;
-      BimViewer.enableDynamicLighting(!isEnabled);
-      
-      const controls = document.getElementById('lightingControls');
-      const btn = this;
-      
-      if (!isEnabled) {
-        // Enable
-        btn.classList.add('active');
-        btn.innerHTML = '<span class="modern-btn-icon">🌞</span><span>Lighting ON</span>';
-        if (controls) controls.style.display = 'block';
-      } else {
-        // Disable
-        btn.classList.remove('active');
-        btn.innerHTML = '<span class="modern-btn-icon">🌅</span><span>Enable Lighting</span>';
-        if (controls) controls.style.display = 'none';
-      }
-    });
-    
-    // Ambient lighting mode selector
-    document.getElementById('ambientLightMode')?.addEventListener('change', function() {
-      const mode = this.value;
-      if (typeof BimViewer.setAmbientLightingMode === 'function') {
-        BimViewer.setAmbientLightingMode(mode);
-      }
-    });
-    
-    // Time preset buttons
-    document.querySelectorAll('.modern-time-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const preset = this.dataset.time;
-        BimViewer.setPresetTime(preset);
-        
-        // Visual feedback
-        document.querySelectorAll('.modern-time-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-      });
-    });
-    
-    // Time animation toggle
-    document.getElementById('toggleTimeAnimation')?.addEventListener('click', function() {
-      const speed = parseInt(document.getElementById('timeSpeedSlider').value);
-      BimViewer.animateTime(true, speed);
-      this.classList.add('active');
-      document.getElementById('stopTimeAnimation')?.classList.remove('active');
-    });
-    
-    document.getElementById('stopTimeAnimation')?.addEventListener('click', function() {
-      BimViewer.animateTime(false);
-      this.classList.add('active');
-      document.getElementById('toggleTimeAnimation')?.classList.remove('active');
-    });
-    
-    // Time speed slider
-    document.getElementById('timeSpeedSlider')?.addEventListener('input', function() {
-      const speed = parseInt(this.value);
-      document.getElementById('timeSpeedValue').textContent = speed + 'x';
-      
-      // Update speed if animation is running
-      if (BimViewer.lighting?.animateTime) {
-        BimViewer.viewer.clock.multiplier = speed;
-      }
-    });
   },
 
   // Update account badge in header
